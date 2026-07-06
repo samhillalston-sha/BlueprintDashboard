@@ -1,0 +1,35 @@
+{
+  "comment": "The official Blueprint roster. 'slack_name' is how that player's name appears in Slack; null means we haven't seen them post yet.",
+  "players": [
+    {"name": "Evan",          "position": "O Handler",      "slack_name": "mama"},
+    {"name": "Danny K",       "position": "O Handler",      "slack_name": "Danny Klein"},
+    {"name": "Gavin",         "position": "O Handler",      "slack_name": "Gavin May"},
+    {"name": "Noam",          "position": "O Handler",      "slack_name": "Noam Fisherman"},
+    {"name": "Elliott Moore", "position": "O Handler",      "slack_name": null},
+
+    {"name": "Ben E",         "position": "O Cutter",       "slack_name": "Ben Elliott"},
+    {"name": "Oscar",         "position": "O Cutter",       "slack_name": "Oscar de Swaan Arons"},
+    {"name": "Andres",        "position": "O Cutter",       "slack_name": "Andres E. Rodriguez H."},
+    {"name": "Noel",          "position": "O Cutter",       "slack_name": "Noel"},
+    {"name": "Kai",           "position": "O Cutter",       "slack_name": null},
+
+    {"name": "Jesse",         "position": "D Handler",      "slack_name": "Jesse Gan"},
+    {"name": "Ruo",           "position": "D Handler",      "slack_name": "Ruozhou Ye"},
+    {"name": "Levy",          "position": "D Handler",      "slack_name": "Ben Levy"},
+    {"name": "Nadav",         "position": "D Handler",      "slack_name": "Nadav Melamede"},
+    {"name": "Owen",          "position": "D Handler",      "slack_name": "Owen Marschall"},
+    {"name": "Graham",        "position": "D Handler",      "slack_name": "Thomas Graham"},
+
+    {"name": "Cooney",        "position": "D Cutter",       "slack_name": "Chris Cooney"},
+    {"name": "Charlie",       "position": "D Cutter",       "slack_name": null},
+    {"name": "Jeff",          "position": "D Cutter",       "slack_name": "Jeff Voss"},
+    {"name": "Meiland",       "position": "D Cutter",       "slack_name": "Daniel Meiland"},
+    {"name": "Filip",         "position": "D Cutter",       "slack_name": "Filip Icev"},
+    {"name": "Elías",         "position": "D Cutter",       "slack_name": "Elias Griffin"},
+    {"name": "Jasper",        "position": "D Cutter",       "slack_name": "Jasper Beardslee"},
+    {"name": "Walter Roosa",  "position": "D Cutter",       "slack_name": "Walter Roosa III"},
+    {"name": "Curtis",        "position": "D Cutter",       "slack_name": "Curtis Pakgross"},
+
+    {"name": "Alston",        "position": "Utility / Misc", "slack_name": "Sam Alston"}
+  ]
+}

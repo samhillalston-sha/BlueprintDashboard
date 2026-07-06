@@ -15,7 +15,7 @@ dashboard.
 | 1 | Connect to Slack and print recent channel messages | ✅ Done — verified against the live channel |
 | 2 | Classify each post as throwing / cardio / combined (keywords + emoji) | ✅ Done — commissioner's rulings baked in |
 | 3 | Store players and weekly submissions in SQLite (weeks run Mon–Sun) | ✅ Built — loads real posts, prints compliance grid |
-| 4 | Web dashboard: every player, weekly throwing ✓ / cardio ✓ | Not started |
+| 4 | Web dashboard: every player, weekly throwing ✓ / cardio ✓ | ✅ Built — blueprint-sheet theme, roster grouped by position |
 | 5 | Filter players in/out; flag injuries so injured players are excused | Not started |
 | 6 | Blue & white "blueprint" visual theme | Not started |
 
@@ -35,11 +35,16 @@ BlueprintDashboard/
 ├── milestone1_check_slack.py    ← Milestone 1: prints recent channel messages
 ├── milestone2_classify.py       ← Milestone 2: classifies posts, prints a report
 ├── milestone3_load_db.py        ← Milestone 3: fills the database, prints the grid
+├── milestone4_dashboard.py      ← Milestone 4: the web dashboard (serve or save HTML)
+├── roster.json                  ← the official roster, by position
 ├── data/                        ← real team messages, local only (never uploaded)
 ├── blueprint.db                 ← the SQLite database file, local only
+├── templates/
+│   └── dashboard.html           ← the dashboard page (blueprint-sheet theme)
 └── app/                         ← the real application code grows here
     ├── classify.py              ← keyword/emoji classifier (Milestone 2)
-    └── db.py                    ← database schema + weekly compliance (Milestone 3)
+    ├── db.py                    ← database schema + weekly compliance (Milestone 3)
+    └── web.py                   ← builds the dashboard from the database (Milestone 4)
 ```
 
 ## Running Milestone 1

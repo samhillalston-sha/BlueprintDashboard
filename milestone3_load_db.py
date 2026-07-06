@@ -15,6 +15,7 @@ from app import db
 from app.classify import classify
 
 DATA_FILE = Path(__file__).parent / "data" / "messages_sample.json"
+ROSTER_FILE = Path(__file__).parent / "roster.json"
 
 
 def main() -> None:
@@ -26,10 +27,14 @@ def main() -> None:
     db.DB_FILE.unlink(missing_ok=True)
     conn = db.connect()
 
+    # The roster goes in first, so every rostered player exists even if
+    # they've never posted. Posters not on the roster are kept but hidden.
+    db.seed_roster(conn, json.loads(ROSTER_FILE.read_text())["players"])
+
     messages = json.loads(DATA_FILE.read_text())
     for message in messages:
         result = classify(message["text"])
-        player_id = db.get_or_create_player(conn, message["user"])
+        player_id = db.player_for_slack_name(conn, message["user"])
         db.add_post(
             conn,
             player_id=player_id,

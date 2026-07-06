@@ -25,9 +25,12 @@ DB_FILE = Path(__file__).resolve().parent.parent / "blueprint.db"
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS players (
     id            INTEGER PRIMARY KEY,
-    name          TEXT NOT NULL UNIQUE,
+    name          TEXT NOT NULL UNIQUE,  -- roster display name (or Slack name if unrostered)
+    slack_name    TEXT UNIQUE,           -- how they appear in Slack messages
     slack_user_id TEXT UNIQUE,           -- Slack's ID for them, e.g. U0123ABC
-    is_active     INTEGER NOT NULL DEFAULT 1  -- 0 = filtered off the dashboard
+    position      TEXT,                  -- O Handler / O Cutter / D Handler / D Cutter / ...
+    is_rostered   INTEGER NOT NULL DEFAULT 0,  -- 1 = on the official roster
+    is_active     INTEGER NOT NULL DEFAULT 1   -- 0 = filtered off the dashboard
 );
 
 CREATE TABLE IF NOT EXISTS posts (
@@ -57,16 +60,59 @@ def week_start_of(day: date) -> date:
     return day - timedelta(days=day.weekday())
 
 
-def get_or_create_player(conn, name: str, slack_user_id: str | None = None) -> int:
-    """Find a player by name, creating them on first sight. Returns their id."""
-    row = conn.execute("SELECT id FROM players WHERE name = ?", (name,)).fetchone()
+def seed_roster(conn, roster_players: list) -> None:
+    """Load the official roster so every rostered player exists in the
+    database — even ones who have never posted (they show as non-compliant,
+    which is the whole point of an accountability dashboard)."""
+    for entry in roster_players:
+        conn.execute(
+            """INSERT INTO players (name, slack_name, position, is_rostered)
+               VALUES (?, ?, ?, 1)
+               ON CONFLICT(name) DO UPDATE
+               SET slack_name = excluded.slack_name,
+                   position = excluded.position,
+                   is_rostered = 1""",
+            (entry["name"], entry["slack_name"], entry["position"]),
+        )
+
+
+def player_for_slack_name(conn, slack_name: str) -> int:
+    """Find the player who posts under this Slack name. People who post but
+    aren't on the roster still get stored (as unrostered), so no data is
+    ever thrown away — the dashboard just doesn't show them by default."""
+    row = conn.execute(
+        "SELECT id FROM players WHERE slack_name = ? OR name = ?",
+        (slack_name, slack_name),
+    ).fetchone()
     if row:
         return row["id"]
     cursor = conn.execute(
-        "INSERT INTO players (name, slack_user_id) VALUES (?, ?)",
-        (name, slack_user_id),
+        "INSERT INTO players (name, slack_name, is_rostered) VALUES (?, ?, 0)",
+        (slack_name, slack_name),
     )
     return cursor.lastrowid
+
+
+def roster_players(conn) -> list:
+    """Every rostered, non-filtered player, in roster (position) order."""
+    position_order = "CASE position WHEN 'O Handler' THEN 0 WHEN 'O Cutter' THEN 1 " \
+                     "WHEN 'D Handler' THEN 2 WHEN 'D Cutter' THEN 3 ELSE 4 END"
+    rows = conn.execute(
+        f"""SELECT id, name, position FROM players
+            WHERE is_rostered = 1 AND is_active = 1
+            ORDER BY {position_order}, id"""
+    )
+    return [dict(row) for row in rows]
+
+
+def unrostered_posters(conn) -> list:
+    """People who post in the channel but aren't on the official roster."""
+    rows = conn.execute(
+        """SELECT DISTINCT p.name FROM players p
+           JOIN posts po ON po.player_id = p.id
+           WHERE p.is_rostered = 0 ORDER BY p.name"""
+    )
+    return [row["name"] for row in rows]
 
 
 def add_post(
@@ -103,25 +149,29 @@ def all_weeks(conn) -> list:
     return [row["week_start"] for row in rows]
 
 
-def weekly_compliance(conn) -> dict:
+def weekly_compliance(conn, rostered_only: bool = True) -> dict:
     """The heart of the dashboard.
 
     Returns {player_name: {week_start: {"throwing": bool, "cardio": bool}}}.
-    A week that's missing from a player's dict means they posted nothing.
+    Every included player appears, even with zero posts (empty inner dict).
+    A week missing from a player's dict means they posted nothing that week.
     """
+    where = "p.is_active = 1" + (" AND p.is_rostered = 1" if rostered_only else "")
     rows = conn.execute(
-        """SELECT p.name, po.week_start,
-                  MAX(po.label IN ('throwing', 'combined')) AS throwing_ok,
-                  MAX(po.label IN ('cardio', 'combined'))   AS cardio_ok
-           FROM posts po JOIN players p ON p.id = po.player_id
-           WHERE p.is_active = 1
-           GROUP BY p.name, po.week_start
-           ORDER BY p.name, po.week_start"""
+        f"""SELECT p.name, po.week_start,
+                   MAX(po.label IN ('throwing', 'combined')) AS throwing_ok,
+                   MAX(po.label IN ('cardio', 'combined'))   AS cardio_ok
+            FROM players p LEFT JOIN posts po ON po.player_id = p.id
+            WHERE {where}
+            GROUP BY p.name, po.week_start
+            ORDER BY p.name, po.week_start"""
     )
     result: dict = {}
     for row in rows:
-        result.setdefault(row["name"], {})[row["week_start"]] = {
-            "throwing": bool(row["throwing_ok"]),
-            "cardio": bool(row["cardio_ok"]),
-        }
+        result.setdefault(row["name"], {})
+        if row["week_start"] is not None:
+            result[row["name"]][row["week_start"]] = {
+                "throwing": bool(row["throwing_ok"]),
+                "cardio": bool(row["cardio_ok"]),
+            }
     return result
