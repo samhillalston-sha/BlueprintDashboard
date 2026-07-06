@@ -20,6 +20,12 @@ IGNORE_PHRASES = [
     "run into",
     "runs into",
     "running into",
+    # Mentioning an upcoming event isn't the same as playing in one:
+    # "pumped for practice tomorrow", "last lift before worlds"
+    "for practice",
+    "before worlds",
+    "miss practice",
+    "practice tomorrow",
 ]
 
 # Each category maps to the words/phrases that signal it. Matching is
@@ -77,13 +83,14 @@ KEYWORDS = {
         "sauna", "suana",  # keeping Filip's typo forever
         "blood flow",
     ],
-    # Playing ultimate — practices, leagues, pickup, tournaments
+    # Playing ultimate — practices, leagues, pickup, tournaments.
+    # Team ruling: counts as fitness (the cardio box), NOT throwing.
     "ultimate": [
         "practice", "league", "tournament", "pickup", "mini", "pod",
         "mccarren",  # Brooklyn pickup game the team goes to
         "fli", "worlds", "regionals", "nationals",
     ],
-    # Other sports — active, but is it cardio credit? (team policy call)
+    # Other sports — team ruling: these count as cardio too
     "sports": [
         "volleyball", "tennis", "basketball", "hooping", "hoops",
         "soccer", "footy", "pickleball", "disc golf",
@@ -115,17 +122,19 @@ class Classification:
 
     @property
     def label(self) -> str:
-        """The single headline verdict for this post."""
-        if "throwing" in self.tags and "cardio" in self.tags:
+        """The single headline verdict for this post.
+
+        Team policy (ruled by the commissioner, July 2026):
+        - playing ultimate and other sports count toward the CARDIO box
+        - strength / PT / mobility count toward neither box
+        """
+        cardio_credit = self.tags & {"cardio", "ultimate", "sports"}
+        if "throwing" in self.tags and cardio_credit:
             return "combined"          # one post, both boxes ticked
         if "throwing" in self.tags:
             return "throwing"
-        if "cardio" in self.tags:
+        if cardio_credit:
             return "cardio"
-        if "ultimate" in self.tags:
-            return "ultimate"           # played frisbee — credit is a policy call
-        if "sports" in self.tags:
-            return "sports"             # other sport — also a policy call
         if self.tags:
             return "strength/recovery"  # active, but neither required category
         return "unclassified"           # we couldn't tell — needs a human look
