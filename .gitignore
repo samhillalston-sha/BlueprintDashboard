@@ -13,5 +13,7 @@ __pycache__/
 # Real team messages pulled from Slack — never publish these
 data/
 
-# Generated output (rebuilt any time with milestone4_dashboard.py)
-dashboard.html
+# Generated output (rebuilt any time with milestone4_dashboard.py).
+# Anchored to the repo root: an unanchored "dashboard.html" also matched
+# templates/dashboard.html, which kept the template out of git entirely.
+/dashboard.html
