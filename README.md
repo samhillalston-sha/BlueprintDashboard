@@ -16,7 +16,7 @@ dashboard.
 | 2 | Classify each post as throwing / cardio / combined (keywords + emoji) | ✅ Done — commissioner's rulings baked in |
 | 3 | Store players and weekly submissions in SQLite (weeks run Mon–Sun) | ✅ Built — loads real posts, prints compliance grid |
 | 4 | Web dashboard: every player, weekly throwing ✓ / cardio ✓ | ✅ Built — blueprint-sheet theme, roster grouped by position |
-| 5 | Filter players in/out; flag injuries so injured players are excused | Not started |
+| 5 | Filter players in/out; flag injuries so injured players are excused | ✅ Built — injury log, EX chips, hide/show filters |
 | 6 | Blue & white "blueprint" visual theme | Not started |
 
 Ideas for later: automatic scheduled syncing, AI image classification of the
@@ -37,7 +37,8 @@ BlueprintDashboard/
 ├── milestone3_load_db.py        ← Milestone 3: fills the database, prints the grid
 ├── milestone4_dashboard.py      ← Milestone 4: the web dashboard (serve or save HTML)
 ├── roster.json                  ← the official roster, by position
-├── data/                        ← real team messages, local only (never uploaded)
+├── data/                        ← local only (never uploaded): real team messages
+│                                   and injuries.json (the injury log)
 ├── blueprint.db                 ← the SQLite database file, local only
 ├── templates/
 │   └── dashboard.html           ← the dashboard page (blueprint-sheet theme)

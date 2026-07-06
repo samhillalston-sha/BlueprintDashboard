@@ -47,72 +47,100 @@ def season_weeks(conn, today: date) -> list:
     return weeks
 
 
+def build_row(name: str, player_weeks: dict, injuries: list, weeks: list,
+              current_week: str, today: date) -> dict:
+    """Build one player's dashboard row: a cell per week plus a season score.
+
+    A box counts as satisfied if the player posted it OR an injury excuses
+    them from it that week.
+    """
+    cells = []
+    complete_count = 0
+    ended_count = 0
+    for week in weeks:
+        status = player_weeks.get(week)
+        ex_throwing, ex_cardio, note = db.injury_excuses_for_week(injuries, week)
+        ended = date.fromisoformat(week) + timedelta(days=7) <= today
+        cell = {
+            "throwing": bool(status and status["throwing"]),
+            "cardio": bool(status and status["cardio"]),
+            "ex_throwing": ex_throwing,
+            "ex_cardio": ex_cardio,
+            "note": note,
+            "silent": status is None and not (ex_throwing or ex_cardio),
+            "current": week == current_week,
+        }
+        throwing_ok = cell["throwing"] or ex_throwing
+        cardio_ok = cell["cardio"] or ex_cardio
+        if ended:
+            ended_count += 1
+            if throwing_ok and cardio_ok:
+                complete_count += 1
+        cell["full"] = throwing_ok and cardio_ok
+        cells.append(cell)
+    return {"name": name, "cells": cells, "score": f"{complete_count}/{ended_count}"}
+
+
 def build_context(today: date | None = None) -> dict:
     """Gather everything the dashboard page needs from the database."""
     today = today or date.today()
     conn = db.connect()
     weeks = season_weeks(conn, today)
-    compliance = db.weekly_compliance(conn)
+    compliance_all = db.weekly_compliance(conn, rostered_only=False)
+    injuries = db.injuries_by_player(conn)
     current_week = db.week_start_of(today).isoformat()
 
-    # Group rostered players by position, building each row's cells.
+    def row_for(name: str) -> dict:
+        return build_row(name, compliance_all.get(name, {}),
+                         injuries.get(name, []), weeks, current_week, today)
+
+    # Rostered players, grouped by position.
     groups = []
+    rostered_names = set()
     for position in POSITION_ORDER:
         players = [p for p in db.roster_players(conn) if p["position"] == position]
         if not players:
             continue
-        rows = []
-        for player in players:
-            player_weeks = compliance.get(player["name"], {})
-            cells = []
-            complete_count = 0
-            ended_count = 0
-            for week in weeks:
-                status = player_weeks.get(week)
-                ended = date.fromisoformat(week) + timedelta(days=7) <= today
-                if ended:
-                    ended_count += 1
-                cell = {
-                    "throwing": bool(status and status["throwing"]),
-                    "cardio": bool(status and status["cardio"]),
-                    "silent": status is None,
-                    "current": week == current_week,
-                }
-                if ended and cell["throwing"] and cell["cardio"]:
-                    complete_count += 1
-                cells.append(cell)
-            rows.append({
-                "name": player["name"],
-                "cells": cells,
-                "score": f"{complete_count}/{ended_count}",
-            })
-        groups.append({"position": position, "rows": rows})
+        rostered_names.update(p["name"] for p in players)
+        groups.append({
+            "position": position,
+            "rows": [row_for(p["name"]) for p in players],
+            "practice": False,
+        })
 
-    # Headline numbers for the most recent COMPLETED week.
+    # Practice players / unrostered posters — same rows, hidden by default.
+    practice_names = db.unrostered_posters(conn)
+    practice_group = {
+        "position": "Practice players / unrostered",
+        "rows": [row_for(name) for name in practice_names],
+        "practice": True,
+    }
+
+    # Headline numbers for the most recent COMPLETED week (rostered only).
     ended_weeks = [w for w in weeks
                    if date.fromisoformat(w) + timedelta(days=7) <= today]
     stats = {"week_label": "—", "full": 0, "partial": 0, "silent": 0, "total": 0}
     if ended_weeks:
         last_week = max(ended_weeks)
+        week_index = weeks.index(last_week)
         stats["week_label"] = week_label(last_week)
         for group in groups:
             for row in group["rows"]:
-                status = compliance.get(row["name"], {}).get(last_week)
+                cell = row["cells"][week_index]
                 stats["total"] += 1
-                if status is None:
-                    stats["silent"] += 1
-                elif status["throwing"] and status["cardio"]:
+                if cell["full"]:
                     stats["full"] += 1
+                elif cell["silent"]:
+                    stats["silent"] += 1
                 else:
                     stats["partial"] += 1
 
     context = {
-        "groups": groups,
+        "groups": groups + ([practice_group] if practice_group["rows"] else []),
         "weeks": weeks,
         "week_labels": [week_label(w) for w in weeks],
         "current_week": current_week,
         "stats": stats,
-        "unrostered": db.unrostered_posters(conn),
         "today": today.strftime("%Y-%m-%d"),
     }
     conn.close()

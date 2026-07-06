@@ -33,6 +33,15 @@ CREATE TABLE IF NOT EXISTS players (
     is_active     INTEGER NOT NULL DEFAULT 1   -- 0 = filtered off the dashboard
 );
 
+CREATE TABLE IF NOT EXISTS injuries (
+    id           INTEGER PRIMARY KEY,
+    player_id    INTEGER NOT NULL REFERENCES players(id),
+    description  TEXT NOT NULL,     -- what happened, e.g. 'turf toe'
+    excused_from TEXT NOT NULL CHECK (excused_from IN ('throwing', 'cardio', 'both')),
+    start_date   TEXT NOT NULL,     -- YYYY-MM-DD
+    end_date     TEXT               -- YYYY-MM-DD, or NULL while still recovering
+);
+
 CREATE TABLE IF NOT EXISTS posts (
     id         INTEGER PRIMARY KEY,
     player_id  INTEGER NOT NULL REFERENCES players(id),
@@ -141,6 +150,52 @@ def add_post(
             slack_ts,
         ),
     )
+
+
+def add_injury(conn, player_name: str, description: str, excused_from: str,
+               start_date: str, end_date: str | None = None) -> None:
+    """Record an injury so the player is excused instead of non-compliant."""
+    row = conn.execute("SELECT id FROM players WHERE name = ?", (player_name,)).fetchone()
+    if row is None:
+        raise ValueError(f"No player named {player_name!r} — check the spelling")
+    conn.execute(
+        """INSERT INTO injuries (player_id, description, excused_from, start_date, end_date)
+           VALUES (?, ?, ?, ?, ?)""",
+        (row["id"], description, excused_from, start_date, end_date),
+    )
+
+
+def injuries_by_player(conn) -> dict:
+    """{player_name: [injury rows]} for every recorded injury."""
+    rows = conn.execute(
+        """SELECT p.name, i.description, i.excused_from, i.start_date, i.end_date
+           FROM injuries i JOIN players p ON p.id = i.player_id"""
+    )
+    result: dict = {}
+    for row in rows:
+        result.setdefault(row["name"], []).append(dict(row))
+    return result
+
+
+def injury_excuses_for_week(injuries: list, week_start: str) -> tuple:
+    """Given one player's injuries, which boxes are excused this week?
+
+    An injury covers a week if the two date ranges overlap at all.
+    Returns (throwing_excused, cardio_excused, note).
+    """
+    week_end = (date.fromisoformat(week_start) + timedelta(days=6)).isoformat()
+    throwing = cardio = False
+    notes = []
+    for injury in injuries:
+        started_before_week_ended = injury["start_date"] <= week_end
+        still_active = injury["end_date"] is None or injury["end_date"] >= week_start
+        if started_before_week_ended and still_active:
+            if injury["excused_from"] in ("throwing", "both"):
+                throwing = True
+            if injury["excused_from"] in ("cardio", "both"):
+                cardio = True
+            notes.append(f"{injury['description']} (excused: {injury['excused_from']})")
+    return throwing, cardio, "; ".join(notes)
 
 
 def all_weeks(conn) -> list:

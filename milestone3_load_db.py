@@ -16,6 +16,10 @@ from app.classify import classify
 
 DATA_FILE = Path(__file__).parent / "data" / "messages_sample.json"
 ROSTER_FILE = Path(__file__).parent / "roster.json"
+INJURY_FILE = Path(__file__).parent / "data" / "injuries.json"
+
+# The commissioner ruled: the season starts June 8. Earlier posts are ignored.
+SEASON_START = date(2026, 6, 8)
 
 
 def main() -> None:
@@ -31,7 +35,8 @@ def main() -> None:
     # they've never posted. Posters not on the roster are kept but hidden.
     db.seed_roster(conn, json.loads(ROSTER_FILE.read_text())["players"])
 
-    messages = json.loads(DATA_FILE.read_text())
+    messages = [m for m in json.loads(DATA_FILE.read_text())
+                if date.fromisoformat(m["date"]) >= SEASON_START]
     for message in messages:
         result = classify(message["text"])
         player_id = db.player_for_slack_name(conn, message["user"])
@@ -43,6 +48,12 @@ def main() -> None:
             label=result.label,
             tags=result.tags,
         )
+    # Injuries go in last (players must exist first).
+    if INJURY_FILE.exists():
+        for injury in json.loads(INJURY_FILE.read_text())["injuries"]:
+            db.add_injury(conn, injury["player"], injury["description"],
+                          injury["excused_from"], injury["start_date"],
+                          injury["end_date"])
     conn.commit()
 
     weeks = db.all_weeks(conn)
