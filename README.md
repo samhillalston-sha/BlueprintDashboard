@@ -12,8 +12,8 @@ dashboard.
 
 | Milestone | What it does | Status |
 |-----------|--------------|--------|
-| 1 | Connect to Slack and print recent channel messages | ✅ Built — needs your Slack token to run |
-| 2 | Classify each post as throwing / cardio / combined (keywords + emoji) | Not started |
+| 1 | Connect to Slack and print recent channel messages | ✅ Done — verified against the live channel |
+| 2 | Classify each post as throwing / cardio / combined (keywords + emoji) | ✅ Built — team reviewing edge-case policy |
 | 3 | Store players and weekly submissions in SQLite (weeks run Mon–Sun) | Not started |
 | 4 | Web dashboard: every player, weekly throwing ✓ / cardio ✓ | Not started |
 | 5 | Filter players in/out; flag injuries so injured players are excused | Not started |
@@ -33,9 +33,10 @@ BlueprintDashboard/
 ├── .env.example                 ← template for your secret settings file
 ├── .gitignore                   ← tells git which files to never upload (like your token)
 ├── milestone1_check_slack.py    ← Milestone 1: prints recent channel messages
-└── app/                         ← the real application code will grow here
-    (empty for now — classification, database, and dashboard code arrive in
-     Milestones 2–4)
+├── milestone2_classify.py       ← Milestone 2: classifies posts, prints a report
+├── data/                        ← real team messages, local only (never uploaded)
+└── app/                         ← the real application code grows here
+    └── classify.py              ← keyword/emoji classifier (Milestone 2)
 ```
 
 ## Running Milestone 1

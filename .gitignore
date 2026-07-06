@@ -9,3 +9,6 @@ __pycache__/
 # The database file (arrives in Milestone 3) — data stays local
 *.db
 *.sqlite3
+
+# Real team messages pulled from Slack — never publish these
+data/
