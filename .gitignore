@@ -1,0 +1,11 @@
+# Secrets — never upload the real token
+.env
+
+# Python's private sandbox and cache files
+.venv/
+__pycache__/
+*.pyc
+
+# The database file (arrives in Milestone 3) — data stays local
+*.db
+*.sqlite3

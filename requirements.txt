@@ -1,0 +1,5 @@
+# Python packages this project depends on.
+# Install them with:  pip install -r requirements.txt
+
+slack-sdk>=3.27      # official Slack library for Python
+python-dotenv>=1.0   # loads settings from the .env file
