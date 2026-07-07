@@ -64,6 +64,9 @@ def build_row(name: str, player_weeks: dict, injuries: list, weeks: list,
         cell = {
             "throwing": bool(status and status["throwing"]),
             "cardio": bool(status and status["cardio"]),
+            # Box earned only by being pictured in a teammate's post (no own post).
+            "throwing_appear": bool(status and status["throwing"] and not status["throwing_own"]),
+            "cardio_appear": bool(status and status["cardio"] and not status["cardio_own"]),
             "ex_throwing": ex_throwing,
             "ex_cardio": ex_cardio,
             "note": note,

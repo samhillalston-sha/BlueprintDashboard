@@ -164,6 +164,12 @@
   .chip.done { background: var(--chip-done-bg); color: var(--chip-done-ink); border-color: var(--chip-done-bg); }
   .chip.miss { color: var(--ink-faint); border-color: var(--ink-faint); }
   .chip.ex   { color: var(--ink); border-style: dashed; }
+  /* Box earned by being pictured in a teammate's post, not your own post.
+     A hollow chip with a corner dot so it reads as "credited, but borrowed". */
+  .chip.appear { background: transparent; color: var(--chip-done-bg);
+    border-color: var(--chip-done-bg); position: relative; }
+  .chip.appear::after { content: ""; position: absolute; top: -2px; right: -2px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--chip-done-bg); }
   .silent-mark { color: var(--ink-faint); letter-spacing: 2px; }
   td.week[data-note]:not([data-note=""]) { cursor: help; }
 
@@ -229,6 +235,7 @@
     <div class="legend">
       <span><span class="chip done">T</span> throwing</span>
       <span><span class="chip done">C</span> cardio</span>
+      <span><span class="chip appear">T</span> by appearance</span>
       <span><span class="chip ex">EX</span> excused (injury)</span>
       <span><span class="chip miss">T</span> missing</span>
     </div>
@@ -264,10 +271,10 @@
               <span class="silent-mark">——</span>
             {% else %}
               <span class="chips">
-                {% if cell.throwing %}<span class="chip done">T</span>
+                {% if cell.throwing %}<span class="chip done{% if cell.throwing_appear %} appear{% endif %}"{% if cell.throwing_appear %} title="throwing credit — pictured in a teammate's post"{% endif %}>T</span>
                 {% elif cell.ex_throwing %}<span class="chip ex">EX</span>
                 {% else %}<span class="chip miss">T</span>{% endif %}
-                {% if cell.cardio %}<span class="chip done">C</span>
+                {% if cell.cardio %}<span class="chip done{% if cell.cardio_appear %} appear{% endif %}"{% if cell.cardio_appear %} title="cardio credit — pictured in a teammate's post"{% endif %}>C</span>
                 {% elif cell.ex_cardio %}<span class="chip ex">EX</span>
                 {% else %}<span class="chip miss">C</span>{% endif %}
               </span>

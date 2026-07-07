@@ -43,15 +43,19 @@ CREATE TABLE IF NOT EXISTS injuries (
 );
 
 CREATE TABLE IF NOT EXISTS posts (
-    id         INTEGER PRIMARY KEY,
-    player_id  INTEGER NOT NULL REFERENCES players(id),
-    posted_on  TEXT NOT NULL,   -- calendar date, like '2026-07-04'
-    week_start TEXT NOT NULL,   -- the Monday of that week (our week key)
-    text       TEXT NOT NULL,
-    label      TEXT NOT NULL,   -- classifier verdict: throwing/cardio/combined/...
-    tags       TEXT NOT NULL DEFAULT '',  -- every category the post mentioned
-    has_photo  INTEGER NOT NULL DEFAULT 0,
-    slack_ts   TEXT UNIQUE      -- Slack's message ID; stops re-syncs duplicating
+    id            INTEGER PRIMARY KEY,
+    player_id     INTEGER NOT NULL REFERENCES players(id),
+    posted_on     TEXT NOT NULL,   -- calendar date, like '2026-07-04'
+    week_start    TEXT NOT NULL,   -- the Monday of that week (our week key)
+    text          TEXT NOT NULL,
+    label         TEXT NOT NULL,   -- classifier verdict: throwing/cardio/combined/...
+    tags          TEXT NOT NULL DEFAULT '',  -- every category the post mentioned
+    has_photo     INTEGER NOT NULL DEFAULT 0,
+    slack_ts      TEXT UNIQUE,     -- Slack's message ID; stops re-syncs duplicating
+    -- 1 = this row is credit for being *pictured* in someone else's post, not a
+    -- post this player made themselves. source_ts points at that original post.
+    is_appearance INTEGER NOT NULL DEFAULT 0,
+    source_ts     TEXT             -- the slack_ts of the post they were pictured in
 );
 """
 
@@ -152,6 +156,44 @@ def add_post(
     )
 
 
+def add_appearance_credit(
+    conn,
+    player_id: int,
+    posted_on: date,
+    label: str,
+    source_ts: str,
+    source_poster: str,
+) -> None:
+    """Give a pictured player the same credit as the post they appear in.
+
+    Being in someone's throwing/cardio selfie counts exactly as if they'd
+    posted it themselves, so we store a normal post row carrying the source
+    post's label — it flows through weekly_compliance untouched — but flag it
+    is_appearance=1 so the dashboard can show it was earned by being pictured.
+    One credit per (player, source post): re-running the loader won't stack.
+    """
+    already = conn.execute(
+        "SELECT 1 FROM posts WHERE player_id = ? AND source_ts = ?",
+        (player_id, source_ts),
+    ).fetchone()
+    if already:
+        return
+    conn.execute(
+        """INSERT INTO posts
+           (player_id, posted_on, week_start, text, label, tags,
+            has_photo, slack_ts, is_appearance, source_ts)
+           VALUES (?, ?, ?, ?, ?, '', 0, NULL, 1, ?)""",
+        (
+            player_id,
+            posted_on.isoformat(),
+            week_start_of(posted_on).isoformat(),
+            f"(pictured in {source_poster}'s post on {posted_on.isoformat()})",
+            label,
+            source_ts,
+        ),
+    )
+
+
 def add_injury(conn, player_name: str, description: str, excused_from: str,
                start_date: str, end_date: str | None = None) -> None:
     """Record an injury so the player is excused instead of non-compliant."""
@@ -207,7 +249,10 @@ def all_weeks(conn) -> list:
 def weekly_compliance(conn, rostered_only: bool = True) -> dict:
     """The heart of the dashboard.
 
-    Returns {player_name: {week_start: {"throwing": bool, "cardio": bool}}}.
+    Returns {player_name: {week_start: {"throwing": bool, "cardio": bool,
+    "throwing_own": bool, "cardio_own": bool}}}. The "_own" flags are true only
+    when the player's *own* post ticked that box; a box that is ok but not _own
+    was earned purely by being pictured in a teammate's post.
     Every included player appears, even with zero posts (empty inner dict).
     A week missing from a player's dict means they posted nothing that week.
     """
@@ -215,7 +260,9 @@ def weekly_compliance(conn, rostered_only: bool = True) -> dict:
     rows = conn.execute(
         f"""SELECT p.name, po.week_start,
                    MAX(po.label IN ('throwing', 'combined')) AS throwing_ok,
-                   MAX(po.label IN ('cardio', 'combined'))   AS cardio_ok
+                   MAX(po.label IN ('cardio', 'combined'))   AS cardio_ok,
+                   MAX(po.is_appearance = 0 AND po.label IN ('throwing', 'combined')) AS throwing_own,
+                   MAX(po.is_appearance = 0 AND po.label IN ('cardio', 'combined'))   AS cardio_own
             FROM players p LEFT JOIN posts po ON po.player_id = p.id
             WHERE {where}
             GROUP BY p.name, po.week_start
@@ -228,5 +275,7 @@ def weekly_compliance(conn, rostered_only: bool = True) -> dict:
             result[row["name"]][row["week_start"]] = {
                 "throwing": bool(row["throwing_ok"]),
                 "cardio": bool(row["cardio_ok"]),
+                "throwing_own": bool(row["throwing_own"]),
+                "cardio_own": bool(row["cardio_own"]),
             }
     return result

@@ -17,10 +17,11 @@ dashboard.
 | 3 | Store players and weekly submissions in SQLite (weeks run Mon–Sun) | ✅ Built — loads real posts, prints compliance grid |
 | 4 | Web dashboard: every player, weekly throwing ✓ / cardio ✓ | ✅ Built — blueprint-sheet theme, roster grouped by position |
 | 5 | Filter players in/out; flag injuries so injured players are excused | ✅ Built — injury log, EX chips, hide/show filters |
-| 6 | Blue & white "blueprint" visual theme | Not started |
+| 6 | Appearance credit: tag who's *pictured* in a selfie; being in a throwing/cardio photo counts for you too | ✅ Built — human-review tool + "by appearance" chips |
 
-Ideas for later: automatic scheduled syncing, AI image classification of the
-selfies themselves.
+(The blue & white "blueprint" drawing-sheet visual theme shipped with
+Milestone 4.) Ideas for later: automatic scheduled syncing, AI image
+classification of the selfies themselves.
 
 ## Project structure
 
@@ -36,12 +37,15 @@ BlueprintDashboard/
 ├── milestone2_classify.py       ← Milestone 2: classifies posts, prints a report
 ├── milestone3_load_db.py        ← Milestone 3: fills the database, prints the grid
 ├── milestone4_dashboard.py      ← Milestone 4: the web dashboard (serve or save HTML)
+├── milestone6_review.py         ← Milestone 6: tag who's pictured in each photo
 ├── roster.json                  ← the official roster, by position
+├── appearances.json             ← who's pictured in which post (committed; survives resets)
 ├── data/                        ← local only (never uploaded): real team messages
 │                                   and injuries.json (the injury log)
 ├── blueprint.db                 ← the SQLite database file, local only
 ├── templates/
-│   └── dashboard.html           ← the dashboard page (blueprint-sheet theme)
+│   ├── dashboard.html           ← the dashboard page (blueprint-sheet theme)
+│   └── review.html              ← the appearance-review page (Milestone 6)
 └── app/                         ← the real application code grows here
     ├── classify.py              ← keyword/emoji classifier (Milestone 2)
     ├── db.py                    ← database schema + weekly compliance (Milestone 3)

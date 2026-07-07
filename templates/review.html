@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Appearance review — Blueprint</title>
+<style>
+  :root {
+    --paper: #10315c; --paper-deep: #0b2547;
+    --line: rgba(214,230,250,0.28); --line-strong: rgba(214,230,250,0.55);
+    --ink: #e8f1fc; --ink-muted: rgba(232,241,252,0.62); --ink-faint: rgba(232,241,252,0.34);
+    --accent: #dce9f9; --accent-ink: #0b2547;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background-color: var(--paper);
+    background-image: linear-gradient(var(--line) 1px, transparent 1px),
+                      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 24px 24px;
+    color: var(--ink); font-family: "Courier New", Courier, monospace; padding: 24px;
+  }
+  .sheet { max-width: 760px; margin: 0 auto; border: 2px solid var(--ink);
+    outline: 1px solid var(--line-strong); outline-offset: 6px;
+    background: var(--paper-deep); }
+  .top { display: flex; justify-content: space-between; align-items: baseline;
+    padding: 12px 18px; border-bottom: 2px solid var(--ink); }
+  .top h1 { margin: 0; font-size: 16px; letter-spacing: 3px; text-transform: uppercase; }
+  .progress { font-size: 12px; letter-spacing: 1px; color: var(--ink-muted); }
+  .bar { height: 4px; background: rgba(232,241,252,0.12); }
+  .bar > div { height: 100%; background: var(--accent); transition: width .2s; }
+
+  .post { padding: 16px 18px; border-bottom: 1px solid var(--line-strong); }
+  .meta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    font-size: 12px; letter-spacing: 1px; color: var(--ink-muted); margin-bottom: 8px; }
+  .badge { border: 1px solid var(--ink-muted); border-radius: 4px; padding: 1px 7px;
+    text-transform: uppercase; letter-spacing: 1px; }
+  .badge.act { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: bold; }
+  .poster { font-size: 20px; letter-spacing: 1px; color: var(--ink); }
+  .caption { margin-top: 6px; font-size: 15px; line-height: 1.45; white-space: pre-wrap; }
+  .slack {
+    display: inline-block; margin-top: 12px; padding: 7px 14px;
+    border: 1px solid var(--accent); border-radius: 5px; color: var(--accent);
+    text-decoration: none; font-size: 13px; letter-spacing: 1px;
+  }
+  .slack:hover { background: var(--accent); color: var(--accent-ink); }
+  .hint { margin-top: 10px; font-size: 11px; color: var(--ink-faint); letter-spacing: 1px; }
+
+  .who { padding: 14px 18px; }
+  .who h2 { font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--ink-muted); margin: 0 0 4px; }
+  .group { margin-top: 12px; }
+  .group .glabel { font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--ink-faint); border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  label.chip { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    border: 1px solid var(--ink-muted); border-radius: 6px; padding: 5px 10px;
+    font-size: 13px; letter-spacing: .5px; user-select: none; }
+  label.chip:hover { border-color: var(--ink); }
+  label.chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: bold; }
+  label.chip input { display: none; }
+  label.chip.locked { background: rgba(232,241,252,0.10); color: var(--ink-muted);
+    border-style: dashed; cursor: default; }
+  .tag { font-size: 9px; letter-spacing: 1px; opacity: .8; }
+
+  .nav { display: flex; justify-content: space-between; align-items: center;
+    gap: 10px; padding: 14px 18px; border-top: 2px solid var(--ink); }
+  .nav a, .nav button { font-family: inherit; font-size: 13px; letter-spacing: 1px;
+    color: var(--ink); background: none; border: 1px solid var(--ink-muted);
+    border-radius: 5px; padding: 8px 14px; text-decoration: none; cursor: pointer; }
+  .nav a.disabled { opacity: .3; pointer-events: none; }
+  .nav .next { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: bold; }
+  .savestate { font-size: 11px; letter-spacing: 1px; color: var(--ink-faint); }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="top">
+    <h1>Who's in the photo?</h1>
+    <span class="progress">post {{ idx + 1 }} / {{ total }} · <span id="reviewed">{{ reviewed_count }}</span> reviewed</span>
+  </div>
+  <div class="bar"><div id="barfill" style="width: {{ (reviewed_count / total * 100) if total else 0 }}%"></div></div>
+
+  <div class="post">
+    <div class="meta">
+      <span>{{ post.date }}</span>
+      <span class="badge act">{{ label }}</span>
+      {% if is_reviewed %}<span class="badge">✓ reviewed</span>{% endif %}
+    </div>
+    <div class="poster">{{ poster_label }}</div>
+    <div class="caption">{{ text }}</div>
+    <a class="slack" href="{{ permalink }}" target="_blank" rel="noopener">Open in Slack ↗</a>
+    <div class="hint">The poster already has this box. Tick anyone else <em>pictured</em> in the photo — they get the same {{ label }} credit for that week.</div>
+  </div>
+
+  <div class="who">
+    <h2>Also pictured</h2>
+    {% set groups = candidates | groupby('group') %}
+    {% for group, members in groups %}
+    <div class="group">
+      <div class="glabel">{{ group }}</div>
+      <div class="chips">
+        {% for c in members %}
+          {% if c.value == poster_value %}
+            <label class="chip locked" title="Poster — already credited">
+              {{ c.label }} <span class="tag">poster</span>
+            </label>
+          {% else %}
+            <label class="chip {% if c.value in selected %}on{% endif %}">
+              <input type="checkbox" value="{{ c.value }}" {% if c.value in selected %}checked{% endif %}>
+              {{ c.label }}
+            </label>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="nav">
+    {% if prev_idx is not none %}<a href="{{ url_for('review', idx=prev_idx) }}">← prev</a>
+    {% else %}<a class="disabled">← prev</a>{% endif %}
+    <span class="savestate" id="savestate">&nbsp;</span>
+    {% if next_idx is not none %}
+      <button class="next" id="nextbtn">save &amp; next →</button>
+    {% else %}
+      <button class="next" id="nextbtn">save &amp; finish ✓</button>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  const TS = {{ post.ts | tojson }};
+  const POSTER = {{ poster_value | tojson }};
+  const TOTAL = {{ total }};
+  const NEXT_URL = {{ (url_for('review', idx=next_idx) if next_idx is not none else url_for('home')) | tojson }};
+
+  function selected() {
+    return [...document.querySelectorAll('.chip input:checked')].map(i => i.value);
+  }
+  async function save() {
+    const state = document.getElementById('savestate');
+    state.textContent = 'saving…';
+    const res = await fetch('/api/save', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ts: TS, poster_value: POSTER, players: selected()})
+    });
+    const data = await res.json();
+    document.getElementById('reviewed').textContent = data.reviewed_count;
+    document.getElementById('barfill').style.width = (data.reviewed_count / TOTAL * 100) + '%';
+    state.textContent = 'saved ✓';
+    return data;
+  }
+  // Toggle chip styling + autosave (this also marks the post reviewed).
+  document.querySelectorAll('.chip input').forEach(input => {
+    input.addEventListener('change', () => {
+      input.closest('.chip').classList.toggle('on', input.checked);
+      save();
+    });
+  });
+  document.getElementById('nextbtn').addEventListener('click', async () => {
+    await save();
+    window.location.href = NEXT_URL;
+  });
+</script>
+</body>
+</html>
