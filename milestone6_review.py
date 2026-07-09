@@ -27,7 +27,7 @@ from app.classify import classify
 ROOT = Path(__file__).parent
 DATA_FILE = ROOT / "data" / "messages_sample.json"
 ROSTER_FILE = ROOT / "roster.json"
-APPEARANCE_FILE = ROOT / "appearances.json"
+APPEARANCE_FILE = ROOT / "data" / "appearances.json"
 
 CREDITABLE = {"throwing", "cardio", "combined"}
 

@@ -26,7 +26,7 @@ to rebuild the dashboard's data from the real channel. The commissioner
    oldest-first; `ts` must be unique.
 2. Run `python milestone3_load_db.py` — rebuilds blueprint.db from
    scratch: seeds `roster.json`, classifies every post (app/classify.py),
-   applies `data/injuries.json` and `appearances.json`, prints the
+   applies `data/injuries.json` and `data/appearances.json`, prints the
    compliance grid
 3. Run `python milestone4_dashboard.py` — regenerates dashboard.html
 4. Send Sam the refreshed dashboard.html + a screenshot
@@ -34,14 +34,18 @@ to rebuild the dashboard's data from the real channel. The commissioner
 ## Appearance credit (who's pictured)
 
 Being pictured in a teammate's throwing/cardio/combined selfie earns the
-same box, so `appearances.json` (repo **root**, committed — unlike data/,
-so the manual review survives a fresh container) maps
+same box, so `data/appearances.json` (gitignored, like the rest of data/ —
+it names real teammates and the repo is public) maps
 `{"<source ts>": {"reviewed": true, "players": ["<name>", ...]}}`.
 milestone3 reads it and grants each listed player the source post's credit.
 It's keyed by `ts`, so it keeps working across re-syncs. To (re)do the
 review, run `python milestone6_review.py` and open http://localhost:8001 —
 it steps through only the creditable photo posts and autosaves your ticks.
 New tags won't appear on the dashboard until you re-run steps 2–3.
+
+Because it's gitignored, a fresh container starts with no appearance
+history — re-review (or restore a saved copy of `data/appearances.json`)
+after a full re-sync in a new container if you want that credit back.
 
 ## Name mapping
 

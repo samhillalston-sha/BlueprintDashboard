@@ -39,9 +39,9 @@ BlueprintDashboard/
 ├── milestone4_dashboard.py      ← Milestone 4: the web dashboard (serve or save HTML)
 ├── milestone6_review.py         ← Milestone 6: tag who's pictured in each photo
 ├── roster.json                  ← the official roster, by position
-├── appearances.json             ← who's pictured in which post (committed; survives resets)
-├── data/                        ← local only (never uploaded): real team messages
-│                                   and injuries.json (the injury log)
+├── data/                        ← local only (never uploaded): real team messages,
+│                                   injuries.json (the injury log), and
+│                                   appearances.json (who's pictured in which post)
 ├── blueprint.db                 ← the SQLite database file, local only
 ├── templates/
 │   ├── dashboard.html           ← the dashboard page (blueprint-sheet theme)

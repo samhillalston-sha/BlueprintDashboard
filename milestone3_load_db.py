@@ -17,9 +17,9 @@ from app.classify import classify
 DATA_FILE = Path(__file__).parent / "data" / "messages_sample.json"
 ROSTER_FILE = Path(__file__).parent / "roster.json"
 INJURY_FILE = Path(__file__).parent / "data" / "injuries.json"
-# Who is *pictured* in each post (manual review, milestone6_review.py). Lives at
-# the repo root, not in data/, so the human effort survives a fresh container.
-APPEARANCE_FILE = Path(__file__).parent / "appearances.json"
+# Who is *pictured* in each post (manual review, milestone6_review.py). Lives
+# in data/ (gitignored) — contains real teammate names, repo is public.
+APPEARANCE_FILE = Path(__file__).parent / "data" / "appearances.json"
 
 # The commissioner ruled: the season starts June 8. Earlier posts are ignored.
 SEASON_START = date(2026, 6, 8)
