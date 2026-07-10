@@ -10,12 +10,15 @@ Run it two ways:
 """
 
 import os
+import secrets
 from datetime import date, timedelta
 from pathlib import Path
 
 from flask import Flask, g, redirect, render_template, request, session, url_for
 
 from app import db
+from app.messaging import store as integration_store
+from app.messaging.slack_provider import SlackOAuthError, SlackProvider
 from app.supabase_auth import AuthError, login_required, sign_in
 
 POSITION_ORDER = ["O Handler", "O Cutter", "D Handler", "D Cutter", "Utility / Misc"]
@@ -182,6 +185,43 @@ def logout():
 @login_required
 def account():
     return render_template("account.html", user=g.user)
+
+
+@app.route("/integrations/slack/install")
+@login_required
+def slack_install():
+    if g.user["role"] != "coach":
+        return "Only a coach can connect Slack.", 403
+    state = secrets.token_urlsafe(24)
+    session["slack_oauth_state"] = state
+    provider = SlackProvider()
+    redirect_uri = url_for("slack_callback", _external=True)
+    return redirect(provider.install_url(redirect_uri, state))
+
+
+@app.route("/integrations/slack/callback")
+@login_required
+def slack_callback():
+    expected_state = session.pop("slack_oauth_state", None)
+    if not expected_state or request.args.get("state") != expected_state:
+        return "Invalid or expired OAuth state — start the install again.", 400
+    code = request.args.get("code")
+    if not code:
+        return f"Slack authorization failed: {request.args.get('error', 'no code returned')}", 400
+
+    provider = SlackProvider()
+    redirect_uri = url_for("slack_callback", _external=True)
+    try:
+        result = provider.exchange_code(code, redirect_uri)
+    except SlackOAuthError as exc:
+        return f"Slack authorization failed: {exc}", 400
+
+    access_token = session["access_token"]
+    integration_id = integration_store.save_integration(
+        access_token, g.user["org_id"], "slack", result.config, g.user["id"],
+    )
+    integration_store.save_credentials(integration_id, result.credentials)
+    return redirect(url_for("account"))
 
 
 def render_static(output_path: Path) -> Path:
