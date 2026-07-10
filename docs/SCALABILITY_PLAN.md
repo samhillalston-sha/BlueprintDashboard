@@ -103,36 +103,99 @@ gitignored by design, and each new session clones the repo fresh). If
 you're starting a new session to continue this work, ask Sam to
 re-paste those same values — he has them saved from the prior session.
 
-Blocker hit and resolved: the sandbox's network egress proxy explicitly
-never supports raw-TCP database connections (port 5432) regardless of
-network policy tier — this is a hard proxy limitation, not
-session-specific. It also returned a 403 policy denial for HTTPS calls
-to `*.supabase.co` under the "Trusted" network tier. Sam has since
-changed this environment's network access setting to **"Full"** and is
-starting a fresh session so it takes effect (network policy changes only
-apply to new sessions).
+Network blocker from the previous session is resolved and confirmed
+permanent, not worth re-testing every session: Full network access
+unblocks HTTPS to `*.supabase.co` (REST/Auth APIs work fine), but raw
+Postgres (port 5432, including the IPv4 connection pooler on 6543) is
+still blocked by the proxy — confirmed by a raw TCP connect timeout, not
+just a DNS/config issue. Don't attempt a direct psql/psycopg2
+connection again. Workflow going forward: schema/RLS/grant changes are
+written as numbered SQL files in `supabase/migrations/` and Sam pastes
+them into the Supabase dashboard's SQL Editor; everything else (app
+runtime, data migration, testing) goes through the HTTPS REST/Auth APIs
+using `curl` or a Python HTTP client — no `supabase-py`/`psycopg2`
+installed in the sandbox, and none needed so far.
 
-Even with Full network access, direct psql/Postgres (port 5432) may
-still not work through the proxy (raw-TCP DBs are called out as
-unsupported in `/root/.ccr/README.md` regardless of tier) — if so,
-don't fight it: run schema/RLS/migration SQL through the Supabase
-dashboard's SQL Editor (Sam pastes SQL there, no connection needed from
-the sandbox), and use the HTTPS-based Supabase REST/Auth APIs (which
-Full access should unblock) for everything else, including the actual
-app's runtime DB access via Supabase's client libraries/PostgREST
-instead of a direct psycopg2 connection if needed.
+Task list (recreated via TaskCreate this session — IDs won't carry over
+to a new session, recreate if useful):
+1. Design multi-tenant schema (organizations, users, team_config, org_id FKs) — DONE
+2. Write RLS policies for tenant isolation — DONE
+3. Migrate existing SQLite data to Postgres/Supabase — NOT STARTED, see below
+4. Wire Supabase Auth into Flask app — not started
+5. Test tenant isolation with two fake orgs — DONE, see below
+6. Manual verification against real team data — blocked on task 3
 
-Task list existed for M1 (created via TaskCreate in the prior session,
-IDs won't carry over — recreate if useful):
-1. Design multi-tenant schema (organizations, users, team_config, org_id FKs)
-2. Write RLS policies for tenant isolation
-3. Migrate existing SQLite data to Postgres/Supabase
-4. Wire Supabase Auth into Flask app
-5. Test tenant isolation with two fake orgs
-6. Manual verification against real team data
+### Task 1 + 2 — done, schema is live
 
-None of these were completed yet — schema design had just started when
-the network blocker was hit. Start from task 1.
+Three migration files exist and have all been run successfully against
+the live Supabase project (Sam pasted them into the SQL Editor):
+- `supabase/migrations/0001_multi_tenant_foundation.sql` — `organizations`,
+  `profiles` (1:1 with `auth.users`, auto-created via an
+  `on_auth_user_created` trigger, `org_id`/`role` start null and get
+  filled in during onboarding), `team_config` (per-org JSONB
+  categories/keywords/rules, replacing hardcoded `app/classify.py`), and
+  `players`/`injuries`/`posts` with `org_id` denormalized onto every row.
+- `supabase/migrations/0002_row_level_security.sql` — RLS on all six
+  tables via two `SECURITY DEFINER` helpers (`current_org_id()`,
+  `is_coach()`); reads scoped to the caller's org, writes restricted to
+  the coach role (the Slack sync job will keep writing through the
+  service-role key, which bypasses RLS, same pattern as the SQLite
+  version's ingestion script).
+- `supabase/migrations/0003_grants.sql` — **required extra step**: tables
+  created via the SQL Editor did NOT automatically get `service_role`/
+  `authenticated` grants on this project (got 42501 permission-denied on
+  every table until this ran). If a future migration adds a new table,
+  remember to grant it too — don't assume Supabase does this by default.
+
+### Task 5 — done, RLS verified against real auth tokens
+
+Created two fake orgs + two fake `auth.users` (via the Auth admin API,
+`email_confirm: true` so no email step needed) + one player each,
+assigned org/role on their profiles, then **signed in as each fake user
+via the real password grant** (`/auth/v1/token?grant_type=password`) to
+get actual JWTs — not just service-role testing. Confirmed with those
+JWTs against PostgREST:
+- Org Alpha's user sees only Alpha's player/org/profile rows; same for Beta.
+- Explicitly filtering for the other org's `org_id` returns empty, not
+  an error and not the row.
+- Cross-org INSERT gets an explicit 403 (`new row violates row-level
+  security policy`).
+- Cross-org UPDATE/DELETE by row id silently affect 0 rows (verified by
+  re-reading the target row from the other org's own token afterward —
+  data was untouched, not silently corrupted).
+
+All test orgs/users/rows were deleted afterward; all six tables were
+confirmed empty again. This is the "two independent orgs" check the
+plan calls out as worth re-verifying at every milestone — it passed
+cleanly for M1's schema. Re-run something like this again after task 4
+(Auth wired into Flask) and again at M2/M3 as the schema grows.
+
+### Task 3 — deliberately not started yet
+
+Started to auto-regenerate `data/messages_sample.json` from a live Slack
+pull (per `docs/RESYNC.md`) in order to have something to migrate, since
+`blueprint.db`/`data/` don't survive a fresh session (gitignored by
+design). Sam stopped this: pulling real team data into a brand-new,
+unproven multi-tenant system before it's fully wired up (auth included)
+was premature — fake-org testing (task 5) was the right thing to prove
+out first, which is now done. **Don't restart the real-data migration
+without checking with Sam first** — it's not just an engineering
+step, it's real athlete data going into new infra for the first time
+this season.
+
+Once it's time: the plan is still to re-sync from Slack (`docs/RESYNC.md`)
+to rebuild the source JSON, then write a one-off script that reads it
+(reusing `app/classify.py` logic, or by then whatever `team_config`
+replaces it with) and inserts into Supabase via the REST API under
+Sam's real org — created first, with his own coach profile properly
+linked, not the throwaway service-role-only pattern used for the RLS test.
+
+### Task 4 — not started
+
+Wire Supabase Auth into `app/web.py`: verify incoming JWTs against
+`SUPABASE_JWKS_URL`, look up `org_id`/`role` from `profiles`, scope every
+query by it. No decisions made yet on session mechanism (cookie vs
+bearer) — that's still open.
 
 ## Working agreements
 
