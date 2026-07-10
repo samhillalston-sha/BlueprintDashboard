@@ -116,14 +116,18 @@ runtime, data migration, testing) goes through the HTTPS REST/Auth APIs
 using `curl` or a Python HTTP client — no `supabase-py`/`psycopg2`
 installed in the sandbox, and none needed so far.
 
+**M1 is fully complete as of this session — all 6 tasks done.** Next
+session should start on M2 (integration abstraction + Slack OAuth) per
+the milestone plan, unless Sam redirects.
+
 Task list (recreated via TaskCreate this session — IDs won't carry over
 to a new session, recreate if useful):
 1. Design multi-tenant schema (organizations, users, team_config, org_id FKs) — DONE
 2. Write RLS policies for tenant isolation — DONE
-3. Migrate existing SQLite data to Postgres/Supabase — NOT STARTED, see below
-4. Wire Supabase Auth into Flask app — not started
+3. Migrate existing SQLite data to Postgres/Supabase — DONE, see below
+4. Wire Supabase Auth into Flask app — DONE, see below
 5. Test tenant isolation with two fake orgs — DONE, see below
-6. Manual verification against real team data — blocked on task 3
+6. Manual verification against real team data — DONE, see below
 
 ### Task 1 + 2 — done, schema is live
 
@@ -170,25 +174,43 @@ plan calls out as worth re-verifying at every milestone — it passed
 cleanly for M1's schema. Re-run something like this again after task 4
 (Auth wired into Flask) and again at M2/M3 as the schema grows.
 
-### Task 3 — deliberately not started yet
+### Task 3 — done: Blueprint's real season is now the M1 proving ground
 
-Started to auto-regenerate `data/messages_sample.json` from a live Slack
-pull (per `docs/RESYNC.md`) in order to have something to migrate, since
-`blueprint.db`/`data/` don't survive a fresh session (gitignored by
-design). Sam stopped this: pulling real team data into a brand-new,
-unproven multi-tenant system before it's fully wired up (auth included)
-was premature — fake-org testing (task 5) was the right thing to prove
-out first, which is now done. **Don't restart the real-data migration
-without checking with Sam first** — it's not just an engineering
-step, it's real athlete data going into new infra for the first time
-this season.
+Sam initially stopped an auto-started Slack pull (pulling real data into
+unproven infra before auth existed was premature) — fake-org testing
+(task 5) went first instead. Once that passed and auth (task 4) was
+wired up, Sam explicitly approved using Blueprint's own real 2026 season
+as the test case for proving out the multi-tenant migration, rather than
+building a second throwaway synthetic dataset.
 
-Once it's time: the plan is still to re-sync from Slack (`docs/RESYNC.md`)
-to rebuild the source JSON, then write a one-off script that reads it
-(reusing `app/classify.py` logic, or by then whatever `team_config`
-replaces it with) and inserts into Supabase via the REST API under
-Sam's real org — created first, with his own coach profile properly
-linked, not the throwaway service-role-only pattern used for the RLS test.
+What exists now, all live in Supabase under one real org:
+- Org **"Blueprint 2026"** (slug `blueprint-2026`) created via service role.
+- Sam invited as coach via the Auth admin `/invite` endpoint (sends a
+  real email so he sets his own password — nobody generated one for
+  him); his `profiles` row has `org_id`/`role='coach'` set immediately
+  (doesn't need to wait for him to accept the invite).
+- `team_config` seeded **programmatically from `app/classify.py`'s
+  `KEYWORDS` dict** (not hand-retyped, so it can't drift):
+  `required_categories: ["throwing","cardio"]`,
+  `cardio_credit_categories: ["cardio","ultimate","sports"]`, matching
+  `Classification.label`'s existing rules exactly.
+- All 26 roster entries from `roster.json` loaded into `players`.
+- Full season pulled from Slack via a subagent (paginated
+  `mcp__Slack__slack_read_channel`, `response_format: "detailed"` — note
+  `"concise"` silently drops file-attachment info, breaking `has_photo`;
+  re-pulled once already, use `"detailed"` from the start next time) —
+  330 top-level messages, 2026-06-08 through 2026-07-10, no gaps, every
+  known roster `slack_name` seen posting. Written to
+  `data/messages_sample.json` (gitignored, as always).
+- `migrate_to_supabase.py` (new script, checked in) — the Postgres/REST
+  equivalent of `milestone3_load_db.py`: classifies each message with
+  the existing `app/classify.py`, finds-or-creates unrostered posters by
+  Slack name, batch-inserts into `posts`. Run: `.venv/bin/python
+  migrate_to_supabase.py <org_id>`. Result: 330 posts inserted, 39 total
+  players (26 rostered + 13 unrostered who actually posted), 36 with at
+  least one post. No `data/injuries.json` existed this session, so
+  injuries weren't migrated — the script supports it (mirrors
+  `add_injury`) whenever that file shows up.
 
 ### Task 4 — done, auth mechanism proven, NOT wired into the real dashboard
 
@@ -196,8 +218,7 @@ Deliberately scoped narrow per Sam's call: build the login mechanism as
 independent, testable code and leave the existing `/` route (Sam's real,
 currently-in-use dashboard, still reading local SQLite) completely
 untouched. Don't gate `/` behind login or switch its data source until
-task 3 (real data migration) actually happens — do NOT do that
-unprompted, ask first.
+Sam asks for it.
 
 What exists now:
 - `app/supabase_auth.py` — `sign_in()` (Auth password grant),
@@ -233,11 +254,49 @@ the right org_id/role (pulled through the real RLS-scoped profile
 lookup, not hardcoded); `/logout` clears the session; a garbage/invalid
 token is rejected by `verify_access_token`.
 
+Sam should have a real invite email from Supabase Auth by now for
+`sam.hill.alston@gmail.com` (Blueprint 2026 org) — once he sets a
+password via that link, `/login` + `/account` should show his real
+coach identity. Nobody has tested that specific end-to-end path yet
+(only the throwaway fake-user path was tested) — worth Sam confirming
+himself, or a future session re-verifying if he hasn't.
+
 Not done / open for later: refresh-token handling, `/signup` (manual
 onboarding only per the product decision, so maybe never needed as a
 public route), rate limiting on `/login`, and — the big one — actually
-pointing a real route's data at Postgres instead of SQLite, which is
-tangled up with task 3.
+pointing a real route's data at Postgres instead of SQLite (still
+nobody's touched `/`, on purpose).
+
+### Task 6 — done: Supabase data verified byte-identical to trusted SQLite output
+
+Strategy: rebuild the exact same weekly compliance grid two ways from
+the identical `data/messages_sample.json` + `roster.json` — once through
+the old, trusted `milestone3_load_db.py` → SQLite → `app/db.py`
+pipeline, once by re-fetching what actually landed in Supabase and
+reimplementing `weekly_compliance`'s grouping logic in Python — and diff
+them. First attempt mismatched (an off-by-omission bug in the
+verification script itself: it skipped creating a week entry for posts
+labeled `strength/recovery`/`unclassified`, showing `--` "no post" where
+it should've shown `··` "posted, neither box ticked" — a bug in the
+check, not the migration). Fixed, re-ran: **byte-identical match**, 330
+posts, 26 rostered players, 5 weeks, both grids character-for-character
+equal.
+
+Also spot-checked that RLS/grants protect the real org, not just the
+earlier throwaway test orgs: an unauthenticated request (anon key, no
+user token) for Blueprint's `posts` gets an outright 403 permission
+denial (not just an empty RLS-filtered result — `anon` has zero table
+grants by design, see task-1/2 notes on `0003_grants.sql`).
+
+The verification script itself was scratch/throwaway (written to the
+session scratchpad, not checked into the repo) — if this needs
+re-running later, it's a ~70 line script, quick to recreate: pull
+`players`+`posts` for the org from PostgREST, regroup by
+`(player_name, week_start)` exactly like `app/db.py`'s
+`weekly_compliance` SQL does (every post creates an entry, not just
+throwing/cardio/combined ones), and diff against
+`app.db.weekly_compliance()`'s output on a freshly-loaded
+`milestone3_load_db.py` run of the same source data.
 
 ## Working agreements
 
