@@ -4,3 +4,6 @@
 slack-sdk>=3.27      # official Slack library for Python
 python-dotenv>=1.0   # loads settings from the .env file
 flask>=3.0           # turns Python functions into web pages (the dashboard)
+requests>=2.31       # talks to the Supabase Auth/REST HTTPS APIs
+pyjwt>=2.8           # verifies Supabase-issued JWTs
+cryptography>=42     # ES256/RS256 signature verification for pyjwt

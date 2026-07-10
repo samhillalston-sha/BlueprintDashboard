@@ -9,16 +9,22 @@ Run it two ways:
   - as a one-off HTML file: python milestone4_dashboard.py
 """
 
+import os
 from datetime import date, timedelta
 from pathlib import Path
 
-from flask import Flask, render_template
+from flask import Flask, g, redirect, render_template, request, session, url_for
 
 from app import db
+from app.supabase_auth import AuthError, login_required, sign_in
 
 POSITION_ORDER = ["O Handler", "O Cutter", "D Handler", "D Cutter", "Utility / Misc"]
 
 app = Flask(__name__, template_folder=str(Path(__file__).parent.parent / "templates"))
+# Falls back to a random key if unset, which just means sessions reset on
+# every restart — fine for now, but set FLASK_SECRET_KEY before this is
+# used by more than one person at a time.
+app.secret_key = os.environ.get("FLASK_SECRET_KEY") or os.urandom(32)
 
 MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
           "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
@@ -150,6 +156,32 @@ def build_context(today: date | None = None) -> dict:
 @app.route("/")
 def dashboard():
     return render_template("dashboard.html", **build_context())
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "GET":
+        return render_template("login.html", error=None)
+    email = request.form.get("email", "").strip()
+    password = request.form.get("password", "")
+    try:
+        tokens = sign_in(email, password)
+    except AuthError as exc:
+        return render_template("login.html", error=exc.message), 401
+    session["access_token"] = tokens["access_token"]
+    return redirect(request.args.get("next") or url_for("account"))
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/account")
+@login_required
+def account():
+    return render_template("account.html", user=g.user)
 
 
 def render_static(output_path: Path) -> Path:

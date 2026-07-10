@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Account — Blueprint</title>
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Courier New", monospace;
+    background-color: #0b3d63;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 24px 24px;
+    color: #eaf3fb;
+    padding: 2.5rem;
+  }
+  h1 {
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+  }
+  dl {
+    max-width: 480px;
+    border: 1px solid rgba(234, 243, 251, 0.5);
+    padding: 1.5rem;
+    background: rgba(11, 61, 99, 0.6);
+  }
+  dt {
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+  dd {
+    margin: 0 0 1rem;
+    font-size: 1rem;
+  }
+  form { margin-top: 1.5rem; }
+  button {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    color: #eaf3fb;
+    border: 1px solid rgba(234, 243, 251, 0.5);
+    font-family: inherit;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <h1>Signed in</h1>
+  <dl>
+    <dt>Email</dt>
+    <dd>{{ user.email }}</dd>
+    <dt>Display name</dt>
+    <dd>{{ user.display_name or "(not set)" }}</dd>
+    <dt>Org ID</dt>
+    <dd>{{ user.org_id or "(none assigned yet)" }}</dd>
+    <dt>Role</dt>
+    <dd>{{ user.role or "(none assigned yet)" }}</dd>
+  </dl>
+  <form method="post" action="{{ url_for('logout') }}">
+    <button type="submit">Sign out</button>
+  </form>
+</body>
+</html>

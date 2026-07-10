@@ -190,12 +190,54 @@ replaces it with) and inserts into Supabase via the REST API under
 Sam's real org — created first, with his own coach profile properly
 linked, not the throwaway service-role-only pattern used for the RLS test.
 
-### Task 4 — not started
+### Task 4 — done, auth mechanism proven, NOT wired into the real dashboard
 
-Wire Supabase Auth into `app/web.py`: verify incoming JWTs against
-`SUPABASE_JWKS_URL`, look up `org_id`/`role` from `profiles`, scope every
-query by it. No decisions made yet on session mechanism (cookie vs
-bearer) — that's still open.
+Deliberately scoped narrow per Sam's call: build the login mechanism as
+independent, testable code and leave the existing `/` route (Sam's real,
+currently-in-use dashboard, still reading local SQLite) completely
+untouched. Don't gate `/` behind login or switch its data source until
+task 3 (real data migration) actually happens — do NOT do that
+unprompted, ask first.
+
+What exists now:
+- `app/supabase_auth.py` — `sign_in()` (Auth password grant),
+  `verify_access_token()` (local JWT verification via `PyJWKClient` +
+  `SUPABASE_JWKS_URL`, algorithms ES256/RS256, audience "authenticated"),
+  `fetch_profile()` (reads `profiles` via PostgREST **using the user's
+  own access token**, so RLS — not app code — is what scopes it to their
+  own row), `current_user()`, and a `login_required` decorator.
+- New Flask routes in `app/web.py`: `GET/POST /login`, `POST /logout`,
+  `GET /account` (a debug page showing the resolved email/org_id/role —
+  this is the provable artifact for this task, not a real feature page).
+  `app.secret_key` comes from `FLASK_SECRET_KEY` (added to `.env`/
+  `.env.example`), falls back to a random key (session resets on
+  restart) if unset.
+- Session holds only the Supabase `access_token`; no refresh-token flow
+  yet (token re-verified fresh on every request, ~1hr Supabase default
+  expiry, fine for this traffic level — revisit if that's annoying).
+
+Sandbox note: the system-installed `cryptography` package is broken here
+(`_cffi_backend` missing, Rust panic on import) — PyJWT's signature
+verification will silently fail to even import in the bare system
+Python. Fixed by using a project venv (`python3 -m venv .venv && .venv/bin/pip
+install -r requirements.txt`) instead of system Python; a fresh
+`cryptography` wheel installs cleanly. Use `.venv/bin/python` /
+`.venv/bin/flask` for anything touching `app/supabase_auth.py`, including
+just running the dashboard.
+
+Verified end-to-end against a real fake org+user (created via Auth admin
+API, cleaned up after): unauthenticated `/account` redirects to
+`/login?next=/account`; wrong password → 401 with on-page error;
+correct password → session cookie set, redirects to `/account` showing
+the right org_id/role (pulled through the real RLS-scoped profile
+lookup, not hardcoded); `/logout` clears the session; a garbage/invalid
+token is rejected by `verify_access_token`.
+
+Not done / open for later: refresh-token handling, `/signup` (manual
+onboarding only per the product decision, so maybe never needed as a
+public route), rate limiting on `/login`, and — the big one — actually
+pointing a real route's data at Postgres instead of SQLite, which is
+tangled up with task 3.
 
 ## Working agreements
 
