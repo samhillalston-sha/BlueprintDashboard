@@ -421,20 +421,43 @@ that it compiles. This was mocked at the provider boundary (never called
 the real Slack API), since there's still no live bot token — see the
 OAuth end-to-end blocker above.
 
+### Channel selection — done
+
+`GET/POST /integrations/slack/channel` (coach-only): after OAuth
+completes, the callback now redirects here instead of straight to
+`/account`. Coach types a channel name (no `#`), the route calls
+`SlackProvider.resolve_channel()` against the org's real stored bot
+token (fetched server-side via `get_integration_for_sync`, never
+exposed to the browser), and on success merges `channel_id`/
+`channel_name` into the existing `integrations.config` — **merges**, not
+overwrites, so `team_id`/`team_name` survive. On failure (channel
+doesn't exist, or bot hasn't been invited to it — OAuth scopes alone
+don't grant channel membership, Slack still requires `/invite
+@Blueprint Dashboard Tracker` in the target channel) shows a clear
+on-page error instead of crashing. `sync_slack.py` still correctly
+refuses to run until `channel_id` is set.
+
+Verified with `app.test_client()` in-process against a throwaway
+org/coach/fake-integration (`resolve_channel` mocked, same reasoning as
+the sync job test — no live bot token to test against yet): form shows
+the connected team name, successful resolution redirects to `/account`
+and the stored config is confirmed merged correctly (not clobbered),
+failed resolution returns 400 with the expected error text instead of a
+500. Cleaned up after.
+
 ### Not done / open for later
 
-- Channel selection UI — `resolve_channel()` exists in `SlackProvider`
-  but nothing in the app calls it or lets a coach pick which channel to
-  sync from after installing (`config.channel_id` stays null until
-  something sets it — `sync_slack.py` refuses to run until it's set).
-  Probably belongs with M3's onboarding UI.
 - Actually scheduling `sync_slack.py` to run (cron, etc.) instead of
   someone invoking it by hand — an M5 ops-hardening concern once
   there's a deployed instance to schedule it on.
 - Discord or any second `MessagingProvider` implementation — not
   started, interface is ready for it whenever it's wanted.
 - The real end-to-end OAuth test (task 4 above) is still the main open
-  item before M2 can be called fully done.
+  item before M2 can be called fully done — everything downstream of it
+  (sync job, channel selection) has only ever been tested against
+  mocked/faked Slack responses, never a real bot token. Don't let that
+  fact get lost — "tested" in this doc almost always means "tested with
+  a mock," not "proven against live Slack."
 
 ## Working agreements
 

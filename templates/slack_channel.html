@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Connect a channel — Blueprint</title>
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Courier New", monospace;
+    background-color: #0b3d63;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 24px 24px;
+    color: #eaf3fb;
+  }
+  form {
+    border: 1px solid rgba(234, 243, 251, 0.5);
+    padding: 2rem 2.5rem;
+    min-width: 320px;
+    background: rgba(11, 61, 99, 0.6);
+  }
+  h1 { margin: 0 0 0.5rem; font-size: 1.1rem; letter-spacing: 0.1em; text-transform: uppercase; }
+  p.hint { font-size: 0.8rem; opacity: 0.8; margin: 0 0 1.5rem; line-height: 1.4; }
+  label { display: block; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase;
+          margin-bottom: 0.25rem; opacity: 0.8; }
+  .prefix { display: flex; align-items: center; margin-bottom: 1rem; }
+  .prefix span { padding: 0.5rem 0 0.5rem 0.5rem; opacity: 0.7; }
+  input {
+    flex: 1;
+    box-sizing: border-box;
+    padding: 0.5rem;
+    background: transparent;
+    border: 1px solid rgba(234, 243, 251, 0.5);
+    border-left: none;
+    color: #eaf3fb;
+    font-family: inherit;
+    font-size: 1rem;
+  }
+  button {
+    width: 100%;
+    padding: 0.6rem;
+    background: #eaf3fb;
+    color: #0b3d63;
+    border: none;
+    font-family: inherit;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .error { color: #ffb4a2; font-size: 0.85rem; margin-bottom: 1rem; }
+  .connected { font-size: 0.85rem; margin-bottom: 1rem; opacity: 0.9; }
+</style>
+</head>
+<body>
+  <form method="post">
+    <h1>Connect a channel</h1>
+    <p class="hint">
+      Connected to Slack workspace <strong>{{ config.team_name }}</strong>.
+      Type the name of the public channel to sync fitness posts from — make
+      sure the bot's already been invited there (<code>/invite @Blueprint
+      Dashboard Tracker</code> in that channel).
+    </p>
+    {% if config.channel_name %}
+      <div class="connected">Currently syncing: #{{ config.channel_name }}</div>
+    {% endif %}
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <label for="channel_name">Channel</label>
+    <div class="prefix">
+      <span>#</span>
+      <input type="text" id="channel_name" name="channel_name" required autofocus
+             placeholder="doyoulikefitness">
+    </div>
+    <button type="submit">Connect channel</button>
+  </form>
+</body>
+</html>

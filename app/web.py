@@ -221,6 +221,36 @@ def slack_callback():
         access_token, g.user["org_id"], "slack", result.config, g.user["id"],
     )
     integration_store.save_credentials(integration_id, result.credentials)
+    return redirect(url_for("slack_channel"))
+
+
+@app.route("/integrations/slack/channel", methods=["GET", "POST"])
+@login_required
+def slack_channel():
+    if g.user["role"] != "coach":
+        return "Only a coach can configure Slack.", 403
+
+    existing = integration_store.get_integration_for_sync(g.user["org_id"], "slack")
+    if existing is None:
+        return redirect(url_for("slack_install"))
+    config, credentials = existing
+
+    if request.method == "GET":
+        return render_template("slack_channel.html", error=None, config=config)
+
+    channel_name = request.form.get("channel_name", "").strip().lstrip("#")
+    channel = SlackProvider().resolve_channel(credentials, channel_name)
+    if channel is None:
+        error = (f'No public channel named "{channel_name}" found. Make sure the '
+                  f"bot's been invited to it in Slack (type /invite @Blueprint Dashboard "
+                  f"Tracker in that channel) and the name is spelled right, with no #.")
+        return render_template("slack_channel.html", error=error, config=config), 400
+
+    config["channel_id"] = channel["id"]
+    config["channel_name"] = channel["name"]
+    integration_store.save_integration(
+        session["access_token"], g.user["org_id"], "slack", config, g.user["id"],
+    )
     return redirect(url_for("account"))
 
 
