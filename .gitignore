@@ -13,5 +13,9 @@ __pycache__/
 # Real team messages pulled from Slack — never publish these
 data/
 
-# Generated output (rebuilt any time with milestone4_dashboard.py)
-dashboard.html
+# Generated output (rebuilt any time with milestone4_dashboard.py) —
+# leading slash so this only matches the root-level generated file, not
+# templates/dashboard.html (the actual template source, which must be
+# committed — a bare "dashboard.html" pattern here previously matched
+# and silently swallowed that file too)
+/dashboard.html
