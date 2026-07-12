@@ -298,6 +298,112 @@ throwing/cardio/combined ones), and diff against
 `app.db.weekly_compliance()`'s output on a freshly-loaded
 `milestone3_load_db.py` run of the same source data.
 
+## M2 status / where we left off
+
+M2 = integration abstraction + real Slack OAuth ("Add to Slack" instead
+of manual bot-token copy/paste). Task list:
+1. Design `integrations`/`integration_credentials` tables — DONE
+2. Design `MessagingProvider` interface — DONE
+3. Implement `SlackProvider` + real OAuth install flow — DONE (code), see below
+4. Test end-to-end with a real workspace install — BLOCKED, see below
+
+### What exists now
+
+- `supabase/migrations/0004_integrations.sql` — **not yet run** by Sam
+  (unlike 0001-0003, still pending as of end of this session — check
+  before assuming it's live). Two tables, split for a real security
+  boundary: `integrations` (non-secret config: team id/name, channel,
+  granted scopes — coach-readable via RLS) and `integration_credentials`
+  (bot token — zero grants to `authenticated`/`anon` at all, service-role
+  only, enforced at the GRANT level not just RLS, so even a coach's own
+  valid session token cannot read a live bot token via PostgREST).
+- `app/messaging/base.py` — `MessagingProvider` ABC (`install_url`,
+  `exchange_code`, `fetch_recent_messages`), `Message`/`OAuthResult`
+  value types. Discord or anything else later implements this same
+  interface; nothing else in the app needs to change.
+- `app/messaging/slack_provider.py` — `SlackProvider`: real OAuth v2
+  handshake against `slack.com/oauth/v2/authorize` +
+  `oauth.v2.access`, scopes `channels:history,channels:read,users:read`
+  (least privilege for what M2 does — add `chat:write` later if/when a
+  posting feature exists, don't request it early). Also
+  `resolve_channel()` (find a channel by name the bot can see — bot
+  still needs `/invite @BotName` in Slack itself, OAuth alone doesn't
+  grant channel membership) and `fetch_recent_messages()` (paginated
+  `conversations.history` + `users.info` name resolution, same
+  date/user/text/has_photo shape as `data/messages_sample.json`, so it
+  can be a drop-in replacement for the RESYNC.md/MCP-connector pull path
+  in a deployed instance with real internet access).
+- `app/messaging/store.py` — Supabase persistence, split to match the
+  schema: `save_integration()` uses the coach's own access token (RLS
+  scoped), `save_credentials()` uses the service-role key. Never let
+  these swap — that's the whole point of the split.
+- New Flask routes: `GET /integrations/slack/install` (coach-only,
+  generates CSRF state, redirects to Slack), `GET
+  /integrations/slack/callback` (verifies state, exchanges code, writes
+  both tables).
+- Sam already had a Slack App registered (**"Blueprint Dashboard
+  Tracker"**, App ID `A0BFH2CNKQS`, workspace Blueprint 2026) from
+  before this session — didn't need to create one. Configured this
+  session: Bot Token Scopes (`channels:history`, `channels:read`,
+  `users:read`) and Redirect URL
+  (`http://localhost:5055/integrations/slack/callback` — plain `http`
+  works for Slack's `localhost` exception, no HTTPS/tunnel needed for
+  this dev-loop). `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET` are in `.env`
+  (gitignored, as always) — Sam pasted them mid-session, don't ask again
+  in a future session, just prompt him to re-paste like the Supabase
+  keys.
+
+### Verification done, and why full end-to-end is still blocked
+
+Couldn't drive a real browser from this sandbox reliably (Playwright's
+Chromium hit `ERR_CONNECTION_RESET` going through the agent proxy even
+with `proxy={'server': ...}` set explicitly — didn't dig further, ran
+out of patience budget before Sam wanted to stop for the night; worth
+revisiting if browser automation is needed again). Fell back to having
+Sam click the real authorize URL himself in his own browser and report
+back what he saw — this caught a real bug: the redirect URL wasn't
+actually saved in Slack's app config (or "Save URLs" wasn't clicked),
+producing `redirect_uri did not match any configured URIs`. Sam fixed
+it; re-checked via a plain HTTPS GET from the sandbox (not a full
+browser, but enough to look for that specific error string, which
+disappeared, plus a session cookie now gets set where none did before)
+— reasonably confident the app config is now correct, but this is
+inference from response fingerprinting, not a rendered page. If in
+doubt, ask Sam to click the link once more and describe what loads:
+```
+https://slack.com/oauth/v2/authorize?client_id=<SLACK_CLIENT_ID from .env>&scope=channels%3Ahistory%2Cchannels%3Aread%2Cusers%3Aread&redirect_uri=http%3A%2F%2Flocalhost%3A5055%2Fintegrations%2Fslack%2Fcallback&state=<any-string>
+```
+
+**Why task 4 (real end-to-end test) is still blocked, not just
+untested**: completing the OAuth handshake for real requires Slack to
+redirect the browser to `redirect_uri` with a `code` param, which this
+sandbox can't receive (it's not internet-reachable), and Sam's own
+`localhost:5055` isn't running anything either unless *he* clones the
+repo and runs `.venv/bin/flask --app app.web run --port 5055` on his
+own machine. Two ways to actually finish task 4 in a future session:
+1. Ask Sam to run the Flask app locally himself, click through the real
+   install flow, and confirm an `integrations`/`integration_credentials`
+   row appears for his org — the most realistic test of the real
+   product experience.
+2. Wait until M5 (ops hardening / hosting deploy) gives this a real
+   public HTTPS URL, register that as an additional Slack redirect URL,
+   and test against the deployed instance instead.
+
+Don't just mark task 4 done from a sandbox-side check again — the
+config-is-correct verification done this session is real but partial.
+
+### Not done / open for later
+
+- The actual sync job that calls `fetch_recent_messages()` and feeds it
+  through `app/classify.py` into `posts` — M2 only built the
+  install/OAuth half. Wiring a scheduled or on-demand sync (replacing
+  the manual RESYNC.md runbook for orgs using real OAuth) is unstarted.
+- Channel selection UI — right now `resolve_channel()` exists but
+  nothing in the app calls it or lets a coach pick which channel to
+  sync from after installing. Probably belongs with M3's onboarding UI.
+- Discord or any second `MessagingProvider` implementation — not
+  started, interface is ready for it whenever it's wanted.
+
 ## Working agreements
 
 - Confirm before risky actions (pushes, destructive ops) per standard
