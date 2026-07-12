@@ -4,6 +4,28 @@ Context for Claude: this file is the compressed memory of a long planning
 conversation with Sam. Read this fully before doing any work on the
 scalability effort. Branch: `claude/fitness-dashboard-scalability-h4q7ac`.
 
+## ⚠️ UNAPPLIED SECURITY FIX — check this first
+
+`supabase/migrations/0005_fix_cross_tenant_privilege_escalation.sql`
+fixes a confirmed, reproduced cross-tenant privilege escalation: every
+UPDATE RLS policy from 0002/0004 was missing a WITH CHECK clause, so any
+authenticated user could PATCH their own `profiles.org_id` to any other
+org's ID and immediately gain full coach-level read/write access to
+that org's real data — no new login needed, same JWT. Same bug class
+existed on `team_config`/`players`/`injuries`/`posts`/`integrations`
+(org_id reassignable on any row a user could otherwise legitimately
+update). Reproduced against two throwaway orgs, never against real
+data — see the M3 section below for the exact repro steps if this needs
+re-verifying. **Check whether Sam has run 0005 yet before assuming RLS
+tenant isolation actually holds** — if it hasn't been applied, the
+isolation guarantee tested and celebrated throughout M1 does not
+currently hold against a malicious authenticated user, only against
+unauthenticated ones. Especially don't build or ship any new
+self-service signup/join flow (M3's join-code athlete signup) before
+confirming this is applied — that feature is what turns this from a
+theoretical risk into "any stranger who signs up can read/write any
+team's data."
+
 ## Vision
 
 Turn this from a single-team personal dashboard into a product Sam can
