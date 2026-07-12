@@ -309,9 +309,9 @@ of manual bot-token copy/paste). Task list:
 
 ### What exists now
 
-- `supabase/migrations/0004_integrations.sql` — **not yet run** by Sam
-  (unlike 0001-0003, still pending as of end of this session — check
-  before assuming it's live). Two tables, split for a real security
+- `supabase/migrations/0004_integrations.sql` — confirmed live (verified
+  by successfully reading/writing both tables directly, empty/200 not
+  404/42P01). Two tables, split for a real security
   boundary: `integrations` (non-secret config: team id/name, channel,
   granted scopes — coach-readable via RLS) and `integration_credentials`
   (bot token — zero grants to `authenticated`/`anon` at all, service-role
