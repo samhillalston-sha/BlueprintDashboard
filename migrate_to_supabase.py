@@ -11,65 +11,20 @@ Run it with:  .venv/bin/python migrate_to_supabase.py <org_id>
 """
 
 import json
-import os
 import sys
 from datetime import date
 from pathlib import Path
 
-import requests
-from dotenv import load_dotenv
-
 from app.classify import classify
 from app.db import week_start_of
-
-load_dotenv()
-
-SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
-HEADERS = {
-    "apikey": os.environ["SUPABASE_SECRET_KEY"],
-    "Authorization": f"Bearer {os.environ['SUPABASE_SECRET_KEY']}",
-    "Content-Type": "application/json",
-}
+from app.roster_store import player_id_for_slack_name
+from app.supabase_rest import SERVICE_HEADERS, service_rest as rest
 
 DATA_FILE = Path(__file__).parent / "data" / "messages_sample.json"
 INJURY_FILE = Path(__file__).parent / "data" / "injuries.json"
 
 # The commissioner ruled: the season starts June 8. Earlier posts are ignored.
 SEASON_START = date(2026, 6, 8)
-
-
-def rest(method: str, path: str, *, headers: dict | None = None, **kwargs) -> requests.Response:
-    response = requests.request(method, f"{SUPABASE_URL}/rest/v1/{path}",
-                                 headers=headers or HEADERS, timeout=15, **kwargs)
-    response.raise_for_status()
-    return response
-
-
-def player_id_for_slack_name(org_id: str, slack_name: str, cache: dict) -> int:
-    """Find-or-create a player row by Slack display name, scoped to the org.
-
-    Mirrors app/db.py's player_for_slack_name: posters not on the roster
-    still get stored (as unrostered), matched by slack_name OR name.
-    """
-    if slack_name in cache:
-        return cache[slack_name]
-    existing = rest(
-        "GET", "players",
-        params={"org_id": f"eq.{org_id}",
-                "or": f"(slack_name.eq.{slack_name},name.eq.{slack_name})",
-                "select": "id"},
-    ).json()
-    if existing:
-        cache[slack_name] = existing[0]["id"]
-        return existing[0]["id"]
-    created = rest(
-        "POST", "players",
-        json={"org_id": org_id, "name": slack_name, "slack_name": slack_name,
-              "is_rostered": False},
-        headers={**HEADERS, "Prefer": "return=representation"},
-    ).json()
-    cache[slack_name] = created[0]["id"]
-    return created[0]["id"]
 
 
 def main() -> None:
@@ -107,7 +62,7 @@ def main() -> None:
     inserted = 0
     for i in range(0, len(posts_payload), BATCH):
         batch = posts_payload[i:i + BATCH]
-        rest("POST", "posts", json=batch, headers={**HEADERS, "Prefer": "return=minimal"})
+        rest("POST", "posts", json=batch, headers={**SERVICE_HEADERS, "Prefer": "return=minimal"})
         inserted += len(batch)
     print(f"Inserted {inserted} posts across {len(player_cache)} distinct posters.")
 

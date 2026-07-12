@@ -25,13 +25,20 @@ class OAuthResult:
 
 
 class Message:
-    """One historical post, in the shape the classifier/sync job expects."""
+    """One historical post, in the shape the classifier/sync job expects.
 
-    def __init__(self, posted_on: date, user: str, text: str, has_photo: bool):
+    provider_message_id is the provider's own immutable ID for this
+    message (Slack's `ts`) — lets a repeated sync run safely skip
+    messages it's already stored instead of creating duplicates.
+    """
+
+    def __init__(self, posted_on: date, user: str, text: str, has_photo: bool,
+                 provider_message_id: str):
         self.posted_on = posted_on
         self.user = user
         self.text = text
         self.has_photo = has_photo
+        self.provider_message_id = provider_message_id
 
 
 class MessagingProvider(ABC):

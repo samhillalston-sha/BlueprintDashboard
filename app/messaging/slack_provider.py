@@ -122,6 +122,7 @@ class SlackProvider(MessagingProvider):
                     user=display_name(raw["user"]),
                     text=(raw.get("text") or "").strip(),
                     has_photo=bool(raw.get("files")),
+                    provider_message_id=raw["ts"],
                 ))
             if not response.get("has_more"):
                 break

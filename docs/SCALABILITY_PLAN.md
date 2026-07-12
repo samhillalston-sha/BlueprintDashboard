@@ -392,17 +392,49 @@ own machine. Two ways to actually finish task 4 in a future session:
 Don't just mark task 4 done from a sandbox-side check again — the
 config-is-correct verification done this session is real but partial.
 
+### Sync job — done, tested with a faked Slack response
+
+`sync_slack.py` (new, checked in): `.venv/bin/python sync_slack.py
+<org_id>`. Looks up the org's Slack config+credentials via
+`get_integration_for_sync()`, calls
+`SlackProvider.fetch_recent_messages()` since either the org's most
+recent stored post date or a 14-day default lookback (first sync ever),
+classifies each message with the existing `app/classify.py`, and
+upserts into `posts` keyed on `(org_id, slack_ts)` with
+`resolution=ignore-duplicates` — safe to run on a schedule (cron, etc.)
+without ever creating duplicate posts on re-runs, unlike the one-off
+`migrate_to_supabase.py`.
+
+Refactored `migrate_to_supabase.py` at the same time to stop duplicating
+its own REST/player-lookup helpers — pulled the shared bits out into
+`app/supabase_rest.py` (`service_rest()`, generic service-role PostgREST
+call) and `app/roster_store.py` (`player_id_for_slack_name()`,
+find-or-create). Both scripts and the sync job now share these; don't
+reintroduce a third copy.
+
+Verified with a throwaway test org (created, cleaned up after) and a
+mocked `fetch_recent_messages()` returning 3 fake messages: first run
+stored all 3 with correct classifications, second run against the exact
+same fake messages stored 0 new (all correctly detected as
+already-synced) — confirms the dedup logic actually works, not just
+that it compiles. This was mocked at the provider boundary (never called
+the real Slack API), since there's still no live bot token — see the
+OAuth end-to-end blocker above.
+
 ### Not done / open for later
 
-- The actual sync job that calls `fetch_recent_messages()` and feeds it
-  through `app/classify.py` into `posts` — M2 only built the
-  install/OAuth half. Wiring a scheduled or on-demand sync (replacing
-  the manual RESYNC.md runbook for orgs using real OAuth) is unstarted.
-- Channel selection UI — right now `resolve_channel()` exists but
-  nothing in the app calls it or lets a coach pick which channel to
-  sync from after installing. Probably belongs with M3's onboarding UI.
+- Channel selection UI — `resolve_channel()` exists in `SlackProvider`
+  but nothing in the app calls it or lets a coach pick which channel to
+  sync from after installing (`config.channel_id` stays null until
+  something sets it — `sync_slack.py` refuses to run until it's set).
+  Probably belongs with M3's onboarding UI.
+- Actually scheduling `sync_slack.py` to run (cron, etc.) instead of
+  someone invoking it by hand — an M5 ops-hardening concern once
+  there's a deployed instance to schedule it on.
 - Discord or any second `MessagingProvider` implementation — not
   started, interface is ready for it whenever it's wanted.
+- The real end-to-end OAuth test (task 4 above) is still the main open
+  item before M2 can be called fully done.
 
 ## Working agreements
 

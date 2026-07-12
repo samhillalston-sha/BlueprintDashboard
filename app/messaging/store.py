@@ -57,6 +57,44 @@ def save_credentials(integration_id: int, credentials: dict) -> None:
     response.raise_for_status()
 
 
+def get_integration_for_sync(org_id: str, provider_type: str) -> tuple[dict, dict] | None:
+    """Service-role lookup of (config, credentials) for a sync job.
+
+    Unlike get_integration(), this deliberately uses the service-role
+    key on both tables — a background sync job has no logged-in user's
+    access token to act as, and integration_credentials has zero grants
+    for `authenticated` anyway (only service_role can ever read a bot
+    token). Returns None if the org has no integration for this provider.
+    """
+    headers = {
+        "apikey": SUPABASE_SECRET_KEY,
+        "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
+    }
+    integrations = requests.get(
+        f"{SUPABASE_URL}/rest/v1/integrations",
+        headers=headers,
+        params={"org_id": f"eq.{org_id}", "provider_type": f"eq.{provider_type}", "select": "*"},
+        timeout=10,
+    )
+    integrations.raise_for_status()
+    rows = integrations.json()
+    if not rows:
+        return None
+    integration = rows[0]
+
+    creds = requests.get(
+        f"{SUPABASE_URL}/rest/v1/integration_credentials",
+        headers=headers,
+        params={"integration_id": f"eq.{integration['id']}", "select": "credentials"},
+        timeout=10,
+    )
+    creds.raise_for_status()
+    cred_rows = creds.json()
+    if not cred_rows:
+        return None
+    return integration["config"], cred_rows[0]["credentials"]
+
+
 def get_integration(user_access_token: str, org_id: str, provider_type: str) -> dict | None:
     """Read back the non-secret config for the caller's org (RLS-scoped)."""
     response = requests.get(
