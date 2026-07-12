@@ -64,6 +64,43 @@ def generate_join_code(user_access_token: str, org_id: str) -> str:
     return rows[0]["join_code"]
 
 
+def invite_athlete(org_id: str, email: str) -> None:
+    """Coach invites an athlete by email — mirrors the manual pattern
+    used for Sam's own coach invite in M1, now as a repeatable feature.
+    Sends a real Supabase invite email (service role — the invite/admin
+    endpoints aren't reachable with a coach's own token) and pre-assigns
+    org_id/role so the athlete lands in the right org the moment they
+    accept and set a password, no separate join-code step needed.
+
+    Raises ValueError with a user-facing message on failure (already
+    registered, invalid email, etc).
+    """
+    headers = {
+        "apikey": SUPABASE_SECRET_KEY,
+        "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
+        "Content-Type": "application/json",
+    }
+    response = requests.post(
+        f"{SUPABASE_URL}/auth/v1/invite",
+        headers=headers,
+        json={"email": email},
+        timeout=10,
+    )
+    if response.status_code >= 400:
+        body = response.json()
+        raise ValueError(body.get("msg") or body.get("error_description") or "Could not send invite.")
+    user_id = response.json()["id"]
+
+    assign = requests.patch(
+        f"{SUPABASE_URL}/rest/v1/profiles",
+        headers=headers,
+        params={"id": f"eq.{user_id}"},
+        json={"org_id": org_id, "role": "athlete"},
+        timeout=10,
+    )
+    assign.raise_for_status()
+
+
 def redeem_join_code(user_id: str, code: str) -> dict | None:
     """Look up the org by code and, only if the user has no org yet,
     assign org_id/role='athlete'. Returns the org row on success, None

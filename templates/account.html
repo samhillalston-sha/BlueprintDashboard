@@ -72,6 +72,7 @@
     {% endif %}
     {% if user.role == "coach" %}
       <a class="button" href="{{ url_for('join_code_settings') }}">Team join code</a>
+      <a class="button" href="{{ url_for('invite_athlete_route') }}">Invite athlete</a>
       <a class="button" href="{{ url_for('team_config_settings') }}">Classification rules</a>
       <a class="button" href="{{ url_for('slack_install') }}">Connect Slack</a>
     {% endif %}

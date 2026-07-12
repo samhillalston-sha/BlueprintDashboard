@@ -579,14 +579,44 @@ immediately picks up the coach-saved config and classifies differently
 based on it. Cleaned up after (one test-data keyword gap along the way,
 not a bug — same class of gotcha as the earlier basketball-config test).
 
+### Athlete email invite — done
+
+`GET/POST /settings/invite-athlete` (coach-only). Generalizes the
+manual pattern used once, by hand, for Sam's own coach invite in M1:
+calls Supabase's real `/auth/v1/invite` endpoint (service role — not
+reachable with a coach's own token) to create the account and send a
+real invite email, then immediately assigns `org_id`/`role='athlete'`
+on the new profile so they land in the right org the moment they accept
+and set a password — no separate join-code step needed for this path.
+Read "build both" (invite-by-email/Slack OR join code) as satisfied by
+having one push channel (email) plus the pull channel (join code) —
+Slack-DM invite specifically (as opposed to email) is still a gap, see
+below, but wasn't read as a hard requirement to build both invite
+*channels* on top of the code.
+
+Verified in-process against a throwaway org/coach/athlete: non-coach
+blocked (403); mocked the actual Supabase HTTP call (not the whole
+function) to avoid a third real send against the project's email rate
+limit this session, while still exercising the real
+profile-assignment code path against a real Supabase Auth user —
+confirmed the route calls `/auth/v1/invite` with the right payload and
+correctly assigns `org_id`/`role` afterward; failure path (e.g.
+"already registered") shows Supabase's real error message instead of
+crashing. Cleaned up after.
+
 ### Not done / open for later
 
-- Athlete invite-by-email/Slack (the other half of the "build both"
-  product decision) — not started.
-- Linking a redeemed athlete's profile to an existing roster `players`
-  row (there's a `players.profile_id` column for exactly this, unused
-  so far) — no name-matching UI/logic exists yet. Right now a joined
-  athlete has an account but isn't connected to their roster entry.
+- Slack-DM invite specifically — the product decision mentions it
+  alongside email; only email exists. Would need `SlackProvider` to
+  gain a "send a DM" capability, which only makes sense once an org's
+  Slack integration is connected — a real gap, not just polish.
+- Linking a redeemed/invited athlete's profile to an existing roster
+  `players` row (there's a `players.profile_id` column for exactly
+  this, unused so far) — no name-matching UI/logic exists yet. Right
+  now a joined athlete has an account but isn't connected to their
+  roster entry. This needs a product decision (self-identify vs.
+  coach-assigns, exact-match vs. manual picker) before building —
+  flagging rather than guessing.
 - The config UI's raw-JSON-textarea UX — functional, not friendly. A
   real add/remove-category form is the natural upgrade whenever that
   matters more than shipping speed does.

@@ -229,6 +229,21 @@ def join_code_settings():
     return render_template("join_code.html", code=code)
 
 
+@app.route("/settings/invite-athlete", methods=["GET", "POST"])
+@login_required
+def invite_athlete_route():
+    if g.user["role"] != "coach":
+        return "Only a coach can invite athletes.", 403
+    if request.method == "GET":
+        return render_template("invite_athlete.html", error=None, message=None)
+    email = request.form.get("email", "").strip()
+    try:
+        onboarding_store.invite_athlete(g.user["org_id"], email)
+    except ValueError as exc:
+        return render_template("invite_athlete.html", error=str(exc), message=None), 400
+    return render_template("invite_athlete.html", error=None, message=f"Invited {email}.")
+
+
 @app.route("/settings/config", methods=["GET", "POST"])
 @login_required
 def team_config_settings():
