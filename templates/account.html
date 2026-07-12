@@ -39,7 +39,8 @@
     font-size: 1rem;
   }
   form { margin-top: 1.5rem; }
-  button {
+  button, a.button {
+    display: inline-block;
     padding: 0.5rem 1rem;
     background: transparent;
     color: #eaf3fb;
@@ -47,8 +48,10 @@
     font-family: inherit;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+    text-decoration: none;
     cursor: pointer;
   }
+  .actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -63,8 +66,17 @@
     <dt>Role</dt>
     <dd>{{ user.role or "(none assigned yet)" }}</dd>
   </dl>
-  <form method="post" action="{{ url_for('logout') }}">
-    <button type="submit">Sign out</button>
-  </form>
+  <div class="actions">
+    {% if not user.org_id %}
+      <a class="button" href="{{ url_for('join') }}">Join a team</a>
+    {% endif %}
+    {% if user.role == "coach" %}
+      <a class="button" href="{{ url_for('join_code_settings') }}">Team join code</a>
+      <a class="button" href="{{ url_for('slack_install') }}">Connect Slack</a>
+    {% endif %}
+    <form method="post" action="{{ url_for('logout') }}">
+      <button type="submit">Sign out</button>
+    </form>
+  </div>
 </body>
 </html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Create account — Blueprint</title>
+<style>
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    font-family: "Courier New", monospace; background-color: #0b3d63;
+    background-image: linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+                       linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
+    background-size: 24px 24px; color: #eaf3fb;
+  }
+  form { border: 1px solid rgba(234,243,251,.5); padding: 2rem 2.5rem; min-width: 280px; background: rgba(11,61,99,.6); }
+  h1 { margin: 0 0 1.5rem; font-size: 1.1rem; letter-spacing: .1em; text-transform: uppercase; }
+  label { display: block; font-size: .75rem; letter-spacing: .05em; text-transform: uppercase; margin-bottom: .25rem; opacity: .8; }
+  input { width: 100%; box-sizing: border-box; margin-bottom: 1rem; padding: .5rem; background: transparent;
+          border: 1px solid rgba(234,243,251,.5); color: #eaf3fb; font-family: inherit; font-size: 1rem; }
+  button { width: 100%; padding: .6rem; background: #eaf3fb; color: #0b3d63; border: none; font-family: inherit;
+           font-size: .9rem; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+  .error { color: #ffb4a2; font-size: .85rem; margin-bottom: 1rem; }
+  .message { color: #b8f0c8; font-size: .85rem; margin-bottom: 1rem; }
+  .hint { font-size: .8rem; opacity: .7; margin-top: 1rem; text-align: center; }
+  a { color: #eaf3fb; }
+</style>
+</head>
+<body>
+  <form method="post">
+    <h1>Create an athlete account</h1>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    {% if message %}<div class="message">{{ message }}</div>{% else %}
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" required autofocus>
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required minlength="6">
+    <button type="submit">Create account</button>
+    {% endif %}
+    <div class="hint">Already have an account? <a href="{{ url_for('login') }}">Sign in</a></div>
+  </form>
+</body>
+</html>

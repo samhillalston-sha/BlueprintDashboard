@@ -16,10 +16,10 @@ from pathlib import Path
 
 from flask import Flask, g, redirect, render_template, request, session, url_for
 
-from app import db
+from app import db, onboarding_store
 from app.messaging import store as integration_store
 from app.messaging.slack_provider import SlackOAuthError, SlackProvider
-from app.supabase_auth import AuthError, login_required, sign_in
+from app.supabase_auth import AuthError, login_required, sign_in, sign_up
 
 POSITION_ORDER = ["O Handler", "O Cutter", "D Handler", "D Cutter", "Utility / Misc"]
 
@@ -179,6 +179,53 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "GET":
+        return render_template("signup.html", error=None, message=None)
+    email = request.form.get("email", "").strip()
+    password = request.form.get("password", "")
+    try:
+        result = sign_up(email, password)
+    except AuthError as exc:
+        return render_template("signup.html", error=exc.message, message=None), 400
+    if result.get("access_token"):
+        session["access_token"] = result["access_token"]
+        return redirect(url_for("join"))
+    return render_template("signup.html", error=None,
+                            message="Account created — check your email to confirm it, then log in.")
+
+
+@app.route("/join", methods=["GET", "POST"])
+@login_required
+def join():
+    if g.user["org_id"]:
+        return redirect(url_for("account"))
+    if request.method == "GET":
+        return render_template("join.html", error=None)
+    code = request.form.get("code", "").strip().upper()
+    org = onboarding_store.redeem_join_code(g.user["id"], code)
+    if org is None:
+        return render_template(
+            "join.html",
+            error="That code didn't match a team, or your account is already linked to one.",
+        ), 400
+    return redirect(url_for("account"))
+
+
+@app.route("/settings/join-code", methods=["GET", "POST"])
+@login_required
+def join_code_settings():
+    if g.user["role"] != "coach":
+        return "Only a coach can manage the join code.", 403
+    if request.method == "POST":
+        code = onboarding_store.generate_join_code(session["access_token"], g.user["org_id"])
+    else:
+        org = onboarding_store.get_org(session["access_token"], g.user["org_id"])
+        code = org["join_code"] if org else None
+    return render_template("join_code.html", code=code)
 
 
 @app.route("/account")

@@ -41,6 +41,29 @@ class AuthError(Exception):
         self.message = message
 
 
+def sign_up(email: str, password: str) -> dict:
+    """Self-service account creation (athletes joining via a code — coaches
+    are still invited by Sam manually, per the product decision that org
+    creation itself stays manual/non-self-serve for now).
+
+    Returns the Supabase signup response as-is: it includes an
+    access_token only if the project's email-confirmation setting is
+    off; otherwise the caller needs to tell the user to check their
+    email and log in afterward. Raises AuthError on validation failure
+    (weak password, already-registered email, etc).
+    """
+    response = requests.post(
+        f"{SUPABASE_URL}/auth/v1/signup",
+        headers={"apikey": SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json"},
+        json={"email": email, "password": password},
+        timeout=10,
+    )
+    if response.status_code >= 400:
+        body = response.json()
+        raise AuthError(body.get("error_description") or body.get("msg") or "Could not create account.")
+    return response.json()
+
+
 def sign_in(email: str, password: str) -> dict:
     """Exchange email/password for a Supabase session (access + refresh token).
 

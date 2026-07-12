@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Join code — Blueprint</title>
+<style>
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    font-family: "Courier New", monospace; background-color: #0b3d63;
+    background-image: linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+                       linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
+    background-size: 24px 24px; color: #eaf3fb;
+  }
+  .panel { border: 1px solid rgba(234,243,251,.5); padding: 2rem 2.5rem; min-width: 320px; background: rgba(11,61,99,.6); text-align: center; }
+  h1 { margin: 0 0 1rem; font-size: 1.1rem; letter-spacing: .1em; text-transform: uppercase; }
+  .code { font-size: 2rem; letter-spacing: .3em; margin: 1.5rem 0; }
+  .none { opacity: .7; font-size: .9rem; margin: 1.5rem 0; }
+  form { margin-top: 1rem; }
+  button { padding: .6rem 1.2rem; background: #eaf3fb; color: #0b3d63; border: none; font-family: inherit;
+           font-size: .85rem; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+  p.hint { font-size: .75rem; opacity: .7; }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Team join code</h1>
+    {% if code %}
+      <div class="code">{{ code }}</div>
+      <p class="hint">Share this with athletes — they enter it at /join after creating an account.</p>
+    {% else %}
+      <div class="none">No join code generated yet.</div>
+    {% endif %}
+    <form method="post">
+      <button type="submit">{{ "Regenerate" if code else "Generate" }} code</button>
+    </form>
+  </div>
+</body>
+</html>

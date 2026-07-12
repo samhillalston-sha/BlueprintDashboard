@@ -481,6 +481,91 @@ failed resolution returns 400 with the expected error text instead of a
   fact get lost — "tested" in this doc almost always means "tested with
   a mock," not "proven against live Slack."
 
+## M3 status / where we left off
+
+M3 = coach onboarding UI (join flow) + per-team config UI. Only the
+join-flow half is started; team-config UI is not.
+
+### Roster join flow (email/Slack invite OR shareable code) — code done, tested
+
+Product decision required both invite-by-email/Slack AND a shareable
+join code. Only the join-code half is built so far — invite-by-email
+for *athletes* specifically (as opposed to the coach invite pattern
+already used once, manually, in M1) isn't built; re-check the plan
+before assuming both exist.
+
+What exists now:
+- `app/onboarding_store.py` — `generate_join_code()` (coach's own
+  token — RLS + the column grant from migration 0005 already allow a
+  coach to edit their own org's `join_code`, no service role needed),
+  `redeem_join_code()` (service-role only, both steps: looking up an
+  org by code, and the profiles UPDATE — the redeeming user has no org
+  yet so their own token can't see `organizations` at all, and
+  `profiles.org_id`/`role` are service-role-only since 0005 regardless).
+  The redemption UPDATE includes `org_id=is.null` as a query filter, so
+  it's an atomic single request that only succeeds if the user doesn't
+  already belong to an org — no separate check-then-write race.
+- `app.supabase_auth.sign_up()` — self-service account creation
+  (athletes only; coaches still get invited manually by Sam, org
+  creation itself stays non-self-serve per the product decision).
+  Returns whatever Supabase's `/auth/v1/signup` gives back as-is: an
+  `access_token` if the project has email confirmation OFF, none if
+  it's ON (this project has it ON — confirmed by hitting Supabase's
+  real signup endpoint and getting `email rate limit exceeded`, which
+  only happens if it actually tries to send a confirmation email).
+  Both branches are handled by the `/signup` route.
+- New routes: `GET/POST /signup` (public), `GET/POST /join`
+  (login-required, redirects to `/account` if the user already has an
+  org — won't let someone switch orgs by replaying it),
+  `GET/POST /settings/join-code` (coach-only).
+- `templates/signup.html`, `templates/join.html`, `templates/join_code.html`.
+- `templates/account.html` got small nav links: "Join a team" (if no
+  org yet), "Team join code" + "Connect Slack" (if coach).
+
+Verified with `app.test_client()` in-process against a throwaway
+org/coach/athlete (all via admin-API-created users with
+`email_confirm: true`, sidestepping the real rate limit for testing —
+only the actual `/signup` → real Supabase signup path was mocked, not
+tested against live Supabase again after confirming the rate limit
+exists): coach generates a code, code persists in Supabase; non-coach
+correctly blocked from generating one (403); athlete blocked from
+redeeming a wrong code; athlete successfully redeems the right code and
+`profiles.org_id`/`role` update correctly; **an already-joined athlete
+replaying `/join` gets bounced straight to `/account`, doesn't get to
+switch orgs**; both `/signup` branches (email-confirmation-required vs.
+immediate session) verified via mocking `sign_up` directly, avoiding
+hitting Supabase's email rate limit a third time this session. Cleaned
+up all test data after.
+
+Notably: `redeem_join_code()` was written to use the service-role key
+*before* discovering the 0005 vulnerability, simply because it was the
+obviously-correct pattern (an org-less user's own token has no way to
+even look up an org by code, RLS blocks it). Turned out to also be the
+only safe way to do it once the vulnerability was found — worth noting
+as a case where following the established "service role for
+org_id/role writes" convention from M1 already prevented a whole class
+of bug in new code, independent of whether 0005 has been applied yet.
+
+### Not done / open for later
+
+- Athlete invite-by-email/Slack (the other half of the "build both"
+  product decision) — not started.
+- Linking a redeemed athlete's profile to an existing roster `players`
+  row (there's a `players.profile_id` column for exactly this, unused
+  so far) — no name-matching UI/logic exists yet. Right now a joined
+  athlete has an account but isn't connected to their roster entry.
+- Per-team config UI (keyword list / categories / compliance rules,
+  editing the `team_config` seeded back in M1) — completely unstarted.
+  Bigger than it sounds: `app/classify.py` is still hardcoded
+  module-level constants; the actual classification logic
+  (`sync_slack.py`, `migrate_to_supabase.py`) doesn't read from
+  `team_config` at all yet. Building an edit UI without first making
+  `classify()` actually org-aware would be cosmetic — a coach could
+  edit config that nothing reads. Do the classifier refactor first.
+- Coach "create org" self-serve UI — deliberately out of scope per the
+  product decision (manual onboarding only, Sam sets up each new team
+  himself for now).
+
 ## Working agreements
 
 - Confirm before risky actions (pushes, destructive ops) per standard
