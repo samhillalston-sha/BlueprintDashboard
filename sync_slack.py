@@ -9,12 +9,12 @@ Run it with:  .venv/bin/python sync_slack.py <org_id>
 import sys
 from datetime import date, timedelta
 
-from app.classify import classify
 from app.db import week_start_of
 from app.messaging.slack_provider import SlackProvider
 from app.messaging.store import get_integration_for_sync
 from app.roster_store import player_id_for_slack_name
 from app.supabase_rest import SERVICE_HEADERS, service_rest
+from app.team_config_store import classifier_for_org
 
 # If an org has never synced before, how far back to catch up. Once
 # there's at least one post, we sync forward from the latest one instead.
@@ -55,10 +55,11 @@ def main() -> None:
         print("No messages found since", since.isoformat())
         return
 
+    classifier = classifier_for_org(org_id)
     player_cache: dict = {}
     posts_payload = []
     for message in messages:
-        result = classify(message.text)
+        result = classifier.classify(message.text)
         player_id = player_id_for_slack_name(org_id, message.user, player_cache)
         posts_payload.append({
             "org_id": org_id,

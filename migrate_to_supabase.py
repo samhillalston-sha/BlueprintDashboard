@@ -15,10 +15,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from app.classify import classify
 from app.db import week_start_of
 from app.roster_store import player_id_for_slack_name
 from app.supabase_rest import SERVICE_HEADERS, service_rest as rest
+from app.team_config_store import classifier_for_org
 
 DATA_FILE = Path(__file__).parent / "data" / "messages_sample.json"
 INJURY_FILE = Path(__file__).parent / "data" / "injuries.json"
@@ -40,10 +40,11 @@ def main() -> None:
     messages = [m for m in json.loads(DATA_FILE.read_text())
                 if date.fromisoformat(m["date"]) >= SEASON_START]
 
+    classifier = classifier_for_org(org_id)
     player_cache: dict = {}
     posts_payload = []
     for message in messages:
-        result = classify(message["text"])
+        result = classifier.classify(message["text"])
         player_id = player_id_for_slack_name(org_id, message["user"], player_cache)
         posted_on = date.fromisoformat(message["date"])
         posts_payload.append({

@@ -554,14 +554,71 @@ of bug in new code, independent of whether 0005 has been applied yet.
   row (there's a `players.profile_id` column for exactly this, unused
   so far) — no name-matching UI/logic exists yet. Right now a joined
   athlete has an account but isn't connected to their roster entry.
-- Per-team config UI (keyword list / categories / compliance rules,
-  editing the `team_config` seeded back in M1) — completely unstarted.
-  Bigger than it sounds: `app/classify.py` is still hardcoded
-  module-level constants; the actual classification logic
-  (`sync_slack.py`, `migrate_to_supabase.py`) doesn't read from
-  `team_config` at all yet. Building an edit UI without first making
-  `classify()` actually org-aware would be cosmetic — a coach could
-  edit config that nothing reads. Do the classifier refactor first.
+- Per-team config UI (a coach-facing page to actually edit categories/
+  keywords/rules) — still unstarted, but the prerequisite blocker is
+  gone: see the classifier refactor below. Editing `team_config` rows
+  now actually changes behavior; still no UI to do that editing through
+  (would have to go through the Supabase dashboard directly today).
+
+### Classifier is now team_config-aware — done
+
+Was flagged above as a blocker for the config UI (no point building an
+edit UI for config nothing reads) — fixed. `app/classify.py` now has a
+`Classifier` class parameterized by `categories`/`required_categories`/
+`credit_categories`, with `Classifier.from_team_config()` building one
+from a `team_config` row. The old module-level `KEYWORDS`/
+`IGNORE_PHRASES`/`classify()` all still exist and work exactly as
+before — `classify()` is now a thin wrapper around a default
+`Classifier` built from those same constants, kept for milestone2-4
+(single-team, pre-multi-tenant) scripts and anywhere not yet org-aware.
+
+Deliberately did NOT generalize the required-categories shape beyond
+what `team_config` already encoded in M1 (a primary category + one
+credit-expandable secondary category, e.g. throwing+cardio) — a team
+needing e.g. three genuinely independent required boxes is a new
+product decision, not something to silently invent. `Classifier`
+currently supports `required_categories` of length 1 or 2 only
+(enforced: raises if empty, treats index 1+ as the sole "secondary/
+credit" box).
+
+`app/team_config_store.py` (new, shared) — `classifier_for_org(org_id)`:
+fetches the org's real `team_config` row and builds a `Classifier` from
+it, falling back to Blueprint's hardcoded default with a printed
+warning if the org has no config row yet (e.g. brand new team, no
+config UI exists to set one). Both `sync_slack.py` and
+`migrate_to_supabase.py` now use this instead of the bare `classify()`
+function — the whole point of the exercise, since those are the actual
+multi-tenant data-ingestion paths.
+
+Verification, in order:
+1. Re-ran the exact M1 task-6 regression (rebuild `blueprint.db` via
+   `milestone3_load_db.py`, diff the printed compliance grid) — **byte-
+   identical** to the pre-refactor output captured earlier this session.
+   Confirms the default `classify()` path has zero behavior change.
+2. Fetched Blueprint's *real* stored `team_config` row from Supabase,
+   built a `Classifier` from it via `from_team_config()`, and compared
+   its output against the hardcoded `classify()` default on 6 sample
+   texts (including an `IGNORE_PHRASES` case) — identical tags and
+   labels on every one. Confirms the from-config path, not just the
+   default path, reproduces Blueprint's exact rules when fed Blueprint's
+   exact config.
+3. The real test of the feature: built a throwaway org with a
+   *genuinely different* team_config (a hypothetical basketball team —
+   categories "shooting"/"conditioning"/"lifting", no "throwing"
+   category at all) and ran `sync_slack.py` against it with mocked
+   messages. `"Threw the frisbee around"` — which Blueprint's rules
+   would tag `throwing` — correctly came back `unclassified` for this
+   team, since they have no such category. `"Hit some threes and
+   suicides"` correctly combined shooting+conditioning. This is the
+   actual point of M1's product decision ("make the keyword/slang list
+   and categories per-team configurable instead of hardcoded to one
+   team's slang") — confirmed working, not just plausible-looking code.
+   Cleaned up after (two false starts from a transient sandbox network
+   reset and a test-data keyword gap — see git history if the exact
+   detours matter, neither was a real bug).
+4. Re-ran the sync-job dedup test (from the sync-job section above)
+   after this refactor to confirm the `app/team_config_store.py`
+   extraction didn't regress it — still passes.
 - Coach "create org" self-serve UI — deliberately out of scope per the
   product decision (manual onboarding only, Sam sets up each new team
   himself for now).
