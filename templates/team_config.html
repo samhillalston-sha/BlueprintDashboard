@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Team config — Blueprint</title>
+<style>
+  body {
+    margin: 0; min-height: 100vh; font-family: "Courier New", monospace; background-color: #0b3d63;
+    background-image: linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+                       linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
+    background-size: 24px 24px; color: #eaf3fb; padding: 2.5rem;
+  }
+  h1 { font-size: 1.1rem; letter-spacing: .1em; text-transform: uppercase; margin-bottom: .5rem; }
+  p.hint { font-size: .8rem; opacity: .8; max-width: 640px; line-height: 1.5; margin-bottom: 1.5rem; }
+  form { max-width: 640px; border: 1px solid rgba(234,243,251,.5); padding: 1.5rem 2rem; background: rgba(11,61,99,.6); }
+  label { display: block; font-size: .75rem; letter-spacing: .05em; text-transform: uppercase; margin: 1rem 0 .25rem; opacity: .8; }
+  label:first-child { margin-top: 0; }
+  textarea, input {
+    width: 100%; box-sizing: border-box; padding: .5rem; background: rgba(0,0,0,.2);
+    border: 1px solid rgba(234,243,251,.5); color: #eaf3fb; font-family: inherit; font-size: .9rem;
+  }
+  textarea { min-height: 260px; white-space: pre; }
+  .field-hint { font-size: .7rem; opacity: .6; margin-top: .25rem; }
+  button { margin-top: 1.5rem; padding: .6rem 1.2rem; background: #eaf3fb; color: #0b3d63; border: none;
+           font-family: inherit; font-size: .85rem; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+  .error { color: #ffb4a2; font-size: .85rem; margin-bottom: 1rem; max-width: 640px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+  <h1>Team classification rules</h1>
+  <p class="hint">
+    This drives how posts get classified into "throwing"/"cardio"/etc — see
+    the weekly compliance grid. Changes take effect on the next sync, not
+    retroactively on already-classified posts.
+  </p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post">
+    <label for="categories_json">Categories (JSON array of {key, label, keywords})</label>
+    <textarea id="categories_json" name="categories_json" spellcheck="false">{{ config.categories_json }}</textarea>
+    <div class="field-hint">Example: [{"key": "throwing", "label": "Throwing", "keywords": ["throw", "hucks"]}]</div>
+
+    <label for="required_categories">Required categories (comma-separated category keys)</label>
+    <input type="text" id="required_categories" name="required_categories"
+           value="{{ config.required_categories }}" placeholder="throwing, cardio">
+    <div class="field-hint">First one is the primary box; second (if any) is the credit-expandable box.</div>
+
+    <label for="cardio_credit_categories">Credit categories for the second box (comma-separated)</label>
+    <input type="text" id="cardio_credit_categories" name="cardio_credit_categories"
+           value="{{ config.cardio_credit_categories }}" placeholder="cardio, ultimate, sports">
+
+    <button type="submit">Save</button>
+  </form>
+</body>
+</html>

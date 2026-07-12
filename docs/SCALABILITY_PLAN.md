@@ -546,6 +546,37 @@ as a case where following the established "service role for
 org_id/role writes" convention from M1 already prevented a whole class
 of bug in new code, independent of whether 0005 has been applied yet.
 
+### Per-team config UI — done
+
+`GET/POST /settings/config` (coach-only). Deliberately a raw-JSON
+textarea for `categories` (not a dynamic add/remove-row form builder) —
+a real UX limitation worth upgrading later, but building a full JS form
+for this felt like premature polish before even one real coach has
+asked to edit their config; a JSON textarea is honest about being v0.
+`required_categories`/`cardio_credit_categories` are simpler
+comma-separated text inputs.
+
+`app/config_store.py` (new): `get_team_config()`/`save_team_config()`,
+both through the coach's own token (RLS already allows a coach to
+read/write their own org's `team_config`, no service role needed).
+`save_team_config()` validates before writing — categories must be a
+non-empty list of `{key, keywords, ...}` dicts, `required_categories`/
+`cardio_credit_categories` can't reference a category key that doesn't
+exist, and it actually constructs a real `Classifier` from the proposed
+config (reusing `Classifier.__init__`'s own validation, e.g. "can't have
+zero required categories") so a coach can never save something that
+would crash `sync_slack.py` on the next run.
+
+Verified in-process against a throwaway org/coach/athlete: non-coach
+blocked (403), invalid JSON rejected with a clear message, a
+required-category referencing an undefined category key rejected,
+valid config saves and persists correctly, GET after save shows it
+pre-filled, and — the actual point of the whole M3 classifier effort —
+`classifier_for_org()` (the same function `sync_slack.py` uses)
+immediately picks up the coach-saved config and classifies differently
+based on it. Cleaned up after (one test-data keyword gap along the way,
+not a bug — same class of gotcha as the earlier basketball-config test).
+
 ### Not done / open for later
 
 - Athlete invite-by-email/Slack (the other half of the "build both"
@@ -554,11 +585,9 @@ of bug in new code, independent of whether 0005 has been applied yet.
   row (there's a `players.profile_id` column for exactly this, unused
   so far) — no name-matching UI/logic exists yet. Right now a joined
   athlete has an account but isn't connected to their roster entry.
-- Per-team config UI (a coach-facing page to actually edit categories/
-  keywords/rules) — still unstarted, but the prerequisite blocker is
-  gone: see the classifier refactor below. Editing `team_config` rows
-  now actually changes behavior; still no UI to do that editing through
-  (would have to go through the Supabase dashboard directly today).
+- The config UI's raw-JSON-textarea UX — functional, not friendly. A
+  real add/remove-category form is the natural upgrade whenever that
+  matters more than shipping speed does.
 
 ### Classifier is now team_config-aware — done
 

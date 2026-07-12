@@ -9,6 +9,7 @@ Run it two ways:
   - as a one-off HTML file: python milestone4_dashboard.py
 """
 
+import json
 import os
 import secrets
 from datetime import date, timedelta
@@ -16,7 +17,7 @@ from pathlib import Path
 
 from flask import Flask, g, redirect, render_template, request, session, url_for
 
-from app import db, onboarding_store
+from app import config_store, db, onboarding_store
 from app.messaging import store as integration_store
 from app.messaging.slack_provider import SlackOAuthError, SlackProvider
 from app.supabase_auth import AuthError, login_required, sign_in, sign_up
@@ -226,6 +227,43 @@ def join_code_settings():
         org = onboarding_store.get_org(session["access_token"], g.user["org_id"])
         code = org["join_code"] if org else None
     return render_template("join_code.html", code=code)
+
+
+@app.route("/settings/config", methods=["GET", "POST"])
+@login_required
+def team_config_settings():
+    if g.user["role"] != "coach":
+        return "Only a coach can edit team config.", 403
+    access_token = session["access_token"]
+    org_id = g.user["org_id"]
+
+    if request.method == "POST":
+        raw_config = {
+            "org_id": org_id,
+            "categories_json": request.form.get("categories_json", "[]"),
+            "required_categories": request.form.get("required_categories", ""),
+            "cardio_credit_categories": request.form.get("cardio_credit_categories", ""),
+        }
+        try:
+            categories = json.loads(raw_config["categories_json"])
+        except json.JSONDecodeError as exc:
+            return render_template("team_config.html", config=raw_config,
+                                    error=f"Categories isn't valid JSON: {exc}"), 400
+        required = [c.strip() for c in raw_config["required_categories"].split(",") if c.strip()]
+        credit = [c.strip() for c in raw_config["cardio_credit_categories"].split(",") if c.strip()]
+        try:
+            config_store.save_team_config(access_token, org_id, categories, required, credit)
+        except ValueError as exc:
+            return render_template("team_config.html", config=raw_config, error=str(exc)), 400
+        return redirect(url_for("team_config_settings"))
+
+    config = config_store.get_team_config(access_token, org_id)
+    view_config = {
+        "categories_json": json.dumps(config["categories"], indent=2) if config else "[]",
+        "required_categories": ", ".join(config["required_categories"]) if config else "",
+        "cardio_credit_categories": ", ".join(config["cardio_credit_categories"]) if config else "",
+    }
+    return render_template("team_config.html", config=view_config, error=None)
 
 
 @app.route("/account")
