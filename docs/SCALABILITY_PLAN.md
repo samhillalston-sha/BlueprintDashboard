@@ -4,27 +4,29 @@ Context for Claude: this file is the compressed memory of a long planning
 conversation with Sam. Read this fully before doing any work on the
 scalability effort. Branch: `claude/fitness-dashboard-scalability-h4q7ac`.
 
-## ⚠️ UNAPPLIED SECURITY FIX — check this first
+## Security fix history
 
-`supabase/migrations/0005_fix_cross_tenant_privilege_escalation.sql`
-fixes a confirmed, reproduced cross-tenant privilege escalation: every
-UPDATE RLS policy from 0002/0004 was missing a WITH CHECK clause, so any
+`supabase/migrations/0005_fix_cross_tenant_privilege_escalation.sql` —
+**applied and verified fixed**, same session it was found in. Was a
+confirmed, reproduced cross-tenant privilege escalation: every UPDATE
+RLS policy from 0002/0004 was missing a WITH CHECK clause, so any
 authenticated user could PATCH their own `profiles.org_id` to any other
 org's ID and immediately gain full coach-level read/write access to
 that org's real data — no new login needed, same JWT. Same bug class
-existed on `team_config`/`players`/`injuries`/`posts`/`integrations`
-(org_id reassignable on any row a user could otherwise legitimately
-update). Reproduced against two throwaway orgs, never against real
-data — see the M3 section below for the exact repro steps if this needs
-re-verifying. **Check whether Sam has run 0005 yet before assuming RLS
-tenant isolation actually holds** — if it hasn't been applied, the
-isolation guarantee tested and celebrated throughout M1 does not
-currently hold against a malicious authenticated user, only against
-unauthenticated ones. Especially don't build or ship any new
-self-service signup/join flow (M3's join-code athlete signup) before
-confirming this is applied — that feature is what turns this from a
-theoretical risk into "any stranger who signs up can read/write any
-team's data."
+existed on `team_config`/`players`/`injuries`/`posts`/`integrations`.
+
+Verification, twice: once pre-fix (reproduced the exploit against two
+throwaway orgs — attacker self-promoted into a victim org and read its
+real data with the same token, then cleaned up), once post-fix (same
+exact attack, same technique, against a fresh pair of throwaway orgs —
+this time got an explicit 403 `permission denied for table profiles`
+naming the missing grant, attacker's own profile confirmed unchanged
+afterward, and still couldn't read the victim org's data; separately
+also confirmed the `players` row-reassignment variant is blocked too,
+403 RLS policy violation, row's org_id confirmed unchanged). Neither
+test ever touched real data — see git history (`git log --oneline
+--all -- supabase/migrations/0005*`) for the exact repro scripts if
+this needs re-verifying at a future milestone.
 
 ## Vision
 
