@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BLUEPRINT — Fitness Accountability</title>
+<style>
+  /* ============ Blueprint drawing-sheet theme ============
+     Deep cyanotype blue, white line work, drafting-table grid.
+     This page deliberately commits to one look (a blueprint is
+     blue in any weather), so there is no separate dark mode.  */
+  :root {
+    --paper:   #10265f;   /* blueprint paper */
+    --paper-2: #0b1c4a;   /* deeper pools (tiles, headers) */
+    --ink:     #eaf1ff;   /* primary white ink */
+    --ink-2:   #a9bfe8;   /* secondary ink */
+    --ink-3:   #6d84b8;   /* faint ink (grid annotations) */
+    --line:    rgba(234, 241, 255, .85);
+    --line-2:  rgba(234, 241, 255, .28);
+    --line-3:  rgba(234, 241, 255, .12);
+    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background:
+      linear-gradient(var(--line-3) 1px, transparent 1px) 0 0 / 100% 120px,
+      linear-gradient(90deg, var(--line-3) 1px, transparent 1px) 0 0 / 120px 100%,
+      linear-gradient(rgba(234,241,255,.05) 1px, transparent 1px) 0 0 / 100% 24px,
+      linear-gradient(90deg, rgba(234,241,255,.05) 1px, transparent 1px) 0 0 / 24px 100%,
+      var(--paper);
+    color: var(--ink);
+    font-family: var(--mono);
+    padding: 28px;
+    min-height: 100vh;
+  }
+  .sheet {
+    max-width: 1180px; margin: 0 auto;
+    border: 2px solid var(--line);
+    outline: 1px solid var(--line-2);
+    outline-offset: 5px;
+    background: rgba(11, 28, 74, .35);
+  }
+
+  /* ---- title block, like a drawing sheet's ---- */
+  .titleblock {
+    display: grid;
+    grid-template-columns: 2.2fr 1fr 1fr 1fr 1fr;
+    border-bottom: 2px solid var(--line);
+  }
+  .titleblock > div {
+    padding: 10px 14px; border-right: 1px solid var(--line-2);
+  }
+  .titleblock > div:last-child { border-right: none; }
+  .tb-label {
+    font-size: 10px; letter-spacing: .18em; color: var(--ink-3);
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .tb-value { font-size: 13px; letter-spacing: .06em; }
+  h1 {
+    font-size: 20px; letter-spacing: .22em; font-weight: 600;
+    text-transform: uppercase;
+  }
+  h1 small { display: block; font-size: 11px; letter-spacing: .3em; color: var(--ink-2); margin-top: 4px; }
+
+  /* ---- headline tiles ---- */
+  .tiles {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 0; border-bottom: 2px solid var(--line);
+  }
+  .tile { padding: 16px 18px 14px; border-right: 1px solid var(--line-2); }
+  .tile:last-child { border-right: none; }
+  .tile .num { font-size: 30px; font-weight: 700; letter-spacing: .04em; }
+  .tile .num span { font-size: 15px; color: var(--ink-2); font-weight: 400; }
+  .tile .lbl { font-size: 10px; letter-spacing: .16em; color: var(--ink-2); text-transform: uppercase; margin-top: 4px; }
+
+  /* ---- controls ---- */
+  .controls {
+    display: flex; gap: 22px; align-items: center; flex-wrap: wrap;
+    padding: 10px 18px; border-bottom: 1px solid var(--line-2);
+    font-size: 11px; letter-spacing: .1em; color: var(--ink-2);
+    text-transform: uppercase;
+  }
+  .controls label { cursor: pointer; user-select: none; }
+  .controls input { accent-color: #7aa2ff; margin-right: 6px; vertical-align: -1px; }
+  .controls button {
+    font: inherit; color: var(--ink-2); background: none; cursor: pointer;
+    border: 1px dashed var(--line-2); border-radius: 3px; padding: 3px 10px;
+    letter-spacing: .1em; text-transform: uppercase;
+  }
+  .controls button:hover { color: var(--ink); border-color: var(--line); }
+
+  /* ---- the grid ---- */
+  .gridwrap { overflow-x: auto; padding: 8px 0 2px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 7px 10px; text-align: center; white-space: nowrap; }
+  thead th {
+    font-size: 10px; letter-spacing: .12em; color: var(--ink-2);
+    border-bottom: 1px solid var(--line-2); font-weight: 600;
+  }
+  thead th.player-col, td.player-col { text-align: left; padding-left: 18px; }
+  th.current-col { color: var(--ink); }
+  th.current-col em { font-style: normal; display: block; font-size: 9px; color: var(--ink-3); letter-spacing: .2em; }
+  tbody.posgroup tr.poshead td {
+    text-align: left; padding: 14px 18px 6px;
+    font-size: 11px; letter-spacing: .28em; color: var(--ink-2);
+    text-transform: uppercase; border-bottom: 1px solid var(--line-2);
+  }
+  tbody.posgroup tr.player:hover { background: rgba(234, 241, 255, .05); }
+  td.player-col { font-size: 13px; letter-spacing: .05em; }
+  td.score-col { font-size: 11px; color: var(--ink-2); letter-spacing: .08em; }
+  tr.player td { border-bottom: 1px solid var(--line-3); }
+
+  /* hide/show machinery */
+  .hidebtn {
+    font: inherit; font-size: 10px; color: var(--ink-3);
+    background: none; border: none; cursor: pointer; padding: 0 8px 0 0;
+  }
+  tr.player:hover .hidebtn { color: var(--ink-2); }
+  .hidebtn:hover { color: var(--ink) !important; }
+  tr.player.hidden-player { display: none; }
+  tbody.practice { display: none; }
+  body.show-practice tbody.practice { display: table-row-group; }
+
+  /* the T / C chips */
+  .chip {
+    display: inline-block; min-width: 34px; padding: 2px 6px;
+    font-size: 11px; letter-spacing: .06em;
+    border: 1.5px solid var(--line); border-radius: 3px;
+    background: rgba(234, 241, 255, .16);
+  }
+  .chip + .chip { margin-left: 4px; }
+  .chip.miss {
+    border: 1.5px dashed rgba(169, 191, 232, .5);
+    background: transparent; color: rgba(169, 191, 232, .65);
+  }
+  .chip.ex {
+    border: 1.5px solid rgba(169, 191, 232, .75);
+    color: var(--ink-2);
+    background: repeating-linear-gradient(45deg,
+      transparent 0 4px, rgba(169, 191, 232, .22) 4px 6px);
+  }
+  .silent { color: var(--ink-3); font-size: 12px; letter-spacing: .2em; }
+  td.currentweek { opacity: .75; }
+
+  /* ---- footer ---- */
+  .legend {
+    border-top: 2px solid var(--line);
+    padding: 12px 18px; font-size: 11px; color: var(--ink-2);
+    letter-spacing: .06em; line-height: 2.2;
+  }
+  .legend .chip { transform: scale(.92); }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="titleblock">
+    <div>
+      <h1>Blueprint <small>Fitness Accountability Dashboard</small></h1>
+    </div>
+    <div><div class="tb-label">Sheet</div><div class="tb-value">A-1</div></div>
+    <div><div class="tb-label">Date</div><div class="tb-value">{{ current_week }}</div></div>
+    <div><div class="tb-label">Scale</div><div class="tb-value">1 wk = Mon&ndash;Sun</div></div>
+    <div><div class="tb-label">Spec</div><div class="tb-value">1&times;Throw + 1&times;Cardio</div></div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile">
+      <div class="num">{{ stats.full }}<span> / {{ stats.total }}</span></div>
+      <div class="lbl">Compliant &middot; wk {{ stats.week_label }}</div>
+    </div>
+    <div class="tile">
+      <div class="num">{{ stats.partial }}</div>
+      <div class="lbl">Partial (one box ticked)</div>
+    </div>
+    <div class="tile">
+      <div class="num">{{ stats.silent }}</div>
+      <div class="lbl">No posts that week</div>
+    </div>
+    <div class="tile">
+      <div class="num">{{ weeks|length }}</div>
+      <div class="lbl">Weeks tracked</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <label><input type="checkbox" id="togglePractice"> Show practice players</label>
+    <button id="restoreHidden" hidden>Restore hidden players (<span id="hiddenCount">0</span>)</button>
+    <span style="opacity:.6">✕ next to a name hides that player</span>
+  </div>
+
+  <div class="gridwrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="player-col">Player</th>
+        {% for week in weeks %}
+          <th {% if week == current_week %}class="current-col"{% endif %}>
+            {{ week_labels[loop.index0] }}
+            {% if week == current_week %}<em>in progress</em>{% endif %}
+          </th>
+        {% endfor %}
+        <th>Full wks</th>
+      </tr>
+    </thead>
+    {% for group in groups %}
+    <tbody class="posgroup{% if group.practice %} practice{% endif %}">
+      <tr class="poshead"><td colspan="{{ weeks|length + 2 }}">{{ group.position }}</td></tr>
+      {% for row in group.rows %}
+      <tr class="player" data-player="{{ row.name }}">
+        <td class="player-col">
+          <button class="hidebtn" title="Hide {{ row.name }} from the sheet">✕</button>{{ row.name }}
+        </td>
+        {% for cell in row.cells %}
+        <td {% if cell.current %}class="currentweek"{% endif %}
+            title="{{ row.name }} — {{ week_labels[loop.index0] }}: throwing {{ 'excused' if cell.ex_throwing else ('✓' if cell.throwing else '✗') }}, cardio {{ 'excused' if cell.ex_cardio else ('✓' if cell.cardio else '✗') }}{% if cell.note %} — {{ cell.note }}{% endif %}">
+          {% if cell.silent %}
+            {% if cell.current %}
+            <span class="silent">··</span>
+            {% else %}
+            <span class="silent">——</span>
+            {% endif %}
+          {% else %}
+            {% if cell.ex_throwing %}
+            <span class="chip ex">T EX</span>
+            {% elif cell.throwing %}
+            <span class="chip">T ✓</span>
+            {% else %}
+            <span class="chip miss">T</span>
+            {% endif %}
+            {% if cell.ex_cardio %}
+            <span class="chip ex">C EX</span>
+            {% elif cell.cardio %}
+            <span class="chip">C ✓</span>
+            {% else %}
+            <span class="chip miss">C</span>
+            {% endif %}
+          {% endif %}
+        </td>
+        {% endfor %}
+        <td class="score-col">{{ row.score }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% endfor %}
+  </table>
+  </div>
+
+  <div class="legend">
+    <span class="chip">T ✓</span> throwing posted &nbsp;
+    <span class="chip">C ✓</span> cardio posted (runs, bike, sports, playing ultimate) &nbsp;
+    <span class="chip ex">T EX</span> excused by injury &nbsp;
+    <span class="chip miss">T</span>/<span class="chip miss">C</span> box not ticked &nbsp;
+    <span class="silent">——</span> no posts that week
+    <br>strength / PT / mobility posts count toward neither box (commissioner's ruling) ·
+    hover any cell for details, including injury notes
+  </div>
+
+</div>
+
+<script>
+  // Filters live entirely in your browser (localStorage), so hiding a
+  // player is personal and instantly reversible — the data never changes.
+  const HIDDEN_KEY = "blueprint.hiddenPlayers";
+  const PRACTICE_KEY = "blueprint.showPractice";
+
+  const hidden = new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"));
+  const restoreBtn = document.getElementById("restoreHidden");
+  const hiddenCount = document.getElementById("hiddenCount");
+  const practiceToggle = document.getElementById("togglePractice");
+
+  function applyHidden() {
+    document.querySelectorAll("tr.player").forEach(tr => {
+      tr.classList.toggle("hidden-player", hidden.has(tr.dataset.player));
+    });
+    hiddenCount.textContent = hidden.size;
+    restoreBtn.hidden = hidden.size === 0;
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden]));
+  }
+
+  document.querySelectorAll(".hidebtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      hidden.add(btn.closest("tr").dataset.player);
+      applyHidden();
+    });
+  });
+
+  restoreBtn.addEventListener("click", () => { hidden.clear(); applyHidden(); });
+
+  practiceToggle.checked = localStorage.getItem(PRACTICE_KEY) === "1";
+  function applyPractice() {
+    document.body.classList.toggle("show-practice", practiceToggle.checked);
+    localStorage.setItem(PRACTICE_KEY, practiceToggle.checked ? "1" : "0");
+  }
+  practiceToggle.addEventListener("change", applyPractice);
+
+  applyHidden();
+  applyPractice();
+</script>
+</body>
+</html>
