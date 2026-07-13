@@ -684,6 +684,33 @@ Verification, in order:
   product decision (manual onboarding only, Sam sets up each new team
   himself for now).
 
+## Pre-existing bug found and fixed: the real dashboard was 500ing
+
+Unrelated to the multi-tenant effort itself, but important: `app/web.py`'s
+`/` route (the actual athlete-status page every other milestone in this
+doc has carefully avoided touching) has been completely broken since
+before M1 started — `templates/dashboard.html` didn't exist, so every
+request 500'd with `TemplateNotFound`. Root cause: `.gitignore` had a
+bare `dashboard.html` pattern (meant only for the generated root-level
+output file) that also matched `templates/dashboard.html` at any depth,
+so even if a past session built the template, git silently never
+committed it — fixed by scoping the pattern to `/dashboard.html`.
+
+Reconstructed the template from a rendered output file Sam had saved
+locally from an earlier session (a historical snapshot, not source) by
+reverse-engineering the Jinja structure implied by its markup, matching
+`build_context()`/`build_row()`'s exact data shape. Verified two ways:
+diffed against an independently-computed trusted grid (same technique
+as the M1 task-6 verification) — zero mismatches across all 26 rostered
+players — and manually tested the injury-excused-chip path with a
+synthetic injury (current real data has zero injuries loaded, so that
+path had no live coverage otherwise), then rebuilt `blueprint.db` fresh
+to remove the test injury. `/` now returns 200. Committed in
+`27cff54` (`templates/dashboard.html`) and the `.gitignore` fix.
+
+If a future session is asked to touch the dashboard's actual visual
+design (not just infrastructure), this is the file — and it's real now.
+
 ## Working agreements
 
 - Confirm before risky actions (pushes, destructive ops) per standard
